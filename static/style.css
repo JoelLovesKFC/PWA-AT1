@@ -1,0 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Poppins', sans-serif;
+}
+
+body {
+    /* Add justify-content and align-items to center the form */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #72889b, #37374b);
+    color: #333;
+}
+
+.form-box {
+    width: 100%;
+    max-width: 400px;
+    /* Slightly adjusted width */
+    padding: 40px;
+    /* Increased padding */
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+h2 {
+    font-size: 30px;
+    text-align: left;
+    margin-bottom: 25px;
+    font-weight: 600;
+}
+
+input {
+    width: 100%;
+    padding: 12px;
+    background: #fff;
+    /* Changed from #f1f1f1 */
+    border-radius: 6px;
+    border: 1px solid #ced4da;
+    /* Added border */
+    outline: none;
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.form-control {
+    background-color: #fff;
+    border: 1px solid #ced4da;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    background: #0d6efd;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: #fff;
+    font-weight: 500;
+    margin-bottom: 20px;
+    transition: 0.5s;
+}
+
+button:hover {
+    background: #0b5ed7;
+}
+
+p {
+    font-size: 14px;
+    text-align: left;
+    /* Align with the form elements */
+}
