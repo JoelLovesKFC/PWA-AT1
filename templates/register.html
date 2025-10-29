@@ -14,17 +14,20 @@
         <h2>Create an Account</h2>
         <form method="POST" action="/register">
 
-            <!-- Username -->
+
+            <div class="mb-3">
+                <input type="text" class="form-control" name="name" placeholder="Name">
+
+            </div>
+
             <div class="mb-3"> <!--consistent spacing between all the boxes for both login and reg -->
                 <input type="text" class="form-control" name="username" placeholder="Username" required>
             </div>
 
-            <!-- Email -->
             <div class="mb-3">
                 <input type="email" class="form-control" name="email" placeholder="Email" required>
             </div>
 
-            <!-- Password -->
             <div class="mb-3">
                 <input type="password" class="form-control" name="password" placeholder="Password" required>
             </div>
@@ -34,7 +37,7 @@
                
             </div>
 
-
+             <!-- register button(orginal) -->
             <button id="changeBtn" class="btn btn-primary w-100" onclick="updatedSubmit(event)">Register</button>
 
             <script>
@@ -47,8 +50,6 @@
             }
             </script>
 
-
-            <!-- Link to Login -->
             <p class="text-center mt-3">
                 Already have an account? <a href="/login">Login here</a>
             </p>
