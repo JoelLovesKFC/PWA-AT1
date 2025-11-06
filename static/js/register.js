@@ -1,61 +1,79 @@
+// static/js/register.js
+
 document.addEventListener("DOMContentLoaded", function () {
-    const form = document.getElementById("registerForm");
-    const registerBtn = document.getElementById("registerBtn");
-    const successButton = document.getElementById("successButton");
+      
+    const registerForm = document.getElementById("registerForm");
+    const submitBtn = document.getElementById("submitBtn");
+    const originalButtonHTML = submitBtn.innerHTML;
 
-    form.addEventListener("submit", function (e) {
-        e.preventDefault();
+    registerForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        
 
-        // Collect form values
-        const name = form.name.value.trim();
-        const username = form.username.value.trim();
-        const email = form.email.value.trim();
-        const password = form.password.value.trim();
-        const confirmPassword = form.confirm_password.value.trim();
+        document.querySelectorAll('.text-danger').forEach(el => el.textContent = '');
 
-        // Simple validation
-        if (!name || !username || !email || !password || !confirmPassword) {
-            alert("Please fill in all fields.");
-            return;
-        }
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            Registering...
+        `;
+        
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-        if (password !== confirmPassword) {
-            alert("Passwords do not match.");
-            return;
-        }
-
-        // Validation passed → show success button
-        registerBtn.style.display = "none";
-        successButton.style.display = "block";
-    });
-
-    // Send data to Flask when success button is clicked
-    successButton.addEventListener("click", function () {
-        const payload = {
-            name: form.name.value.trim(),
-            username: form.username.value.trim(),
-            email: form.email.value.trim(),
-            password: form.password.value.trim()
-        };
+        const formData = new FormData(registerForm);
+        const data = {};
+        formData.forEach((value, key) => {
+            data[key] = value;
+        });
 
         fetch("/register", {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfToken
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(data)
         })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === "success") {
-                    window.location.href = "/login"; // redirect to login page
-                } else {
-                    alert("Registration failed. Try again.");
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(errorData => {
+                    const error = new Error('Server responded with an error.');
+                    error.data = errorData; // Attach the server's JSON error message
+                    throw error;
+                });
+            }
+            return response.json();
+        })
+        .then(result => {
+            if (result.status === "success") {
+                submitBtn.innerHTML = 'Success!';
+                submitBtn.classList.remove('btn-primary');
+                submitBtn.classList.add('btn-success');
+                setTimeout(() => {
+                    window.location.href = "/login";
+                }, 1000);
+            }
+        })
+        .catch(error => {
+            console.error("Error:", error);
+
+            if (error.data && error.data.errors) {
+                for (const field in error.data.errors) {
+                    const errorDiv = document.getElementById(`${field}-error`);
+                    const errorMessage = error.data.errors[field];
+                    
+                    if (errorDiv) {
+                        errorDiv.textContent = errorMessage;
+                    } else {
+                        alert(errorMessage);
+                    }
                 }
-            })
-            .catch(err => {
-                console.error(err);
-                alert("An error occurred. Try again."); 
-            });
+            } else {
+                alert("An unknown error occurred. Please try again.");
+            }
+      
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalButtonHTML;
+        });
     });
 });
