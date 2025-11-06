@@ -1,9 +1,10 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import or_
 from flask_bcrypt import Bcrypt
 from flask_wtf.csrf import CSRFProtect
-from flask_limiter import Limiter  # <-- Import Limiter
-from flask_limiter.util import get_remote_address # <-- Import get_remote_address
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import os
 
 app = Flask(__name__)
@@ -11,8 +12,8 @@ app = Flask(__name__)
 limiter = Limiter(
     get_remote_address, # Use the visitor's IP address to track requests
     app=app,
-    default_limits=["200 per day", "50 per hour"], # Default limits for all routes
-    storage_uri="memory://",  # Store rate limit data in memory (for simplicity)
+    default_limits=["200 per day", "50 per hour"], #
+    storage_uri="memory://",  
 )
 
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-key')
@@ -87,20 +88,37 @@ def login():
         return render_template("login.html")
 
     data = request.get_json()
-    email = data.get('email')
+    login_identifier = data.get('login_identifier')
     password = data.get('password')
 
-    if not email or not password:
-        return jsonify({'status': 'error', 'message': 'Email and password are required.'}), 400
+    if not login_identifier or not password:
+        return jsonify({'status': 'error', 'message': 'Username/Email and password are required.'}), 400
 
-    user = User.query.filter_by(email=email).first()
+
+    user = User.query.filter(
+        or_(User.username == login_identifier, User.email == login_identifier)
+    ).first()
 
     if user and bcrypt.check_password_hash(user.password_hash, password):
         session['user_id'] = user.id
         print(f"User '{user.username}' logged in successfully.")
         return jsonify({'status': 'success', 'message': 'Login successful!'}), 200
     else:
-        return jsonify({'status': 'error', 'message': 'Invalid email or password.'}), 401 #failed login still counts twoards rL
+        return jsonify({'status': 'error', 'message': 'Invalid credentials.'}), 401
+    
+
+@app.route("/dashboard")
+def dashboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = User.query.get(session['user_id'])
+    return render_template("dashboard.html", user=user)
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
 
 
 

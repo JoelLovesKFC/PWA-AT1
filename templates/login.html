@@ -4,41 +4,45 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- 1. CRITICAL: Add the CSRF token for security -->
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Login</title>
-
-  <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-
-  <!-- Custom CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style-login.css') }}">
-
 </head>
 
 <body>
   <div class="form-box">
     <h2>Login</h2>
 
-    <form method="POST" action="/login">
+    <!-- 2. UPDATED: Removed method/action, added id for JavaScript to target -->
+    <form id="loginForm">
+
+      <!-- 3. ADDED: Div to show general errors like "Invalid credentials." -->
+      <div id="general-error" class="text-danger mb-2"></div>
+
       <div class="mb-3">
-        <input type="text" class="form-control" name="login" placeholder="Email or Username" required>
+        <input type="text" class="form-control" name="login_identifier" placeholder="Username or Email" required>
       </div>
 
       <div class="mb-3">
         <input type="password" class="form-control" name="password" placeholder="Password" required>
       </div>
 
-      <button type="submit" class="btn btn-primary w-100">Login</button>
+      <button type="submit" id="submitBtn" class="btn btn-primary w-100">Login</button>
 
       <p class="text-center mt-3">
         Don't have an account? <a href="/">Register</a>
       </p>
       <p class="text-center mt-3">
-        Forgotten Password? <a href="/password"></a>
+        Forgotten Password? <a href="/password">Click Here</a>
       </p>
     </form>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- 5. CRITICAL: Include the new login.js script to power the form -->
+  <script src="{{ url_for('static', filename='js/login.js') }}"></script>
 </body>
 
 </html>

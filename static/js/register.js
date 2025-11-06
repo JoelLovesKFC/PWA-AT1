@@ -8,7 +8,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     registerForm.addEventListener("submit", function (event) {
         event.preventDefault();
-        
 
         document.querySelectorAll('.text-danger').forEach(el => el.textContent = '');
 
@@ -38,7 +37,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!response.ok) {
                 return response.json().then(errorData => {
                     const error = new Error('Server responded with an error.');
-                    error.data = errorData; // Attach the server's JSON error message
+                    error.data = errorData; 
                     throw error;
                 });
             }
