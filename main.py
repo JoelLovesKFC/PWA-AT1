@@ -1,10 +1,19 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter  # <-- Import Limiter
+from flask_limiter.util import get_remote_address # <-- Import get_remote_address
 import os
 
 app = Flask(__name__)
+
+limiter = Limiter(
+    get_remote_address, # Use the visitor's IP address to track requests
+    app=app,
+    default_limits=["200 per day", "50 per hour"], # Default limits for all routes
+    storage_uri="memory://",  # Store rate limit data in memory (for simplicity)
+)
 
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-key')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
@@ -71,9 +80,28 @@ def register():
     print(f"User '{username}' successfully registered and stored in database.")
     return jsonify({'status': 'success', 'message': 'Registration successful!'}), 201
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def login():
-    return render_template("login.html")
+    if request.method == 'GET':
+        return render_template("login.html")
+
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+
+    if not email or not password:
+        return jsonify({'status': 'error', 'message': 'Email and password are required.'}), 400
+
+    user = User.query.filter_by(email=email).first()
+
+    if user and bcrypt.check_password_hash(user.password_hash, password):
+        session['user_id'] = user.id
+        print(f"User '{user.username}' logged in successfully.")
+        return jsonify({'status': 'success', 'message': 'Login successful!'}), 200
+    else:
+        return jsonify({'status': 'error', 'message': 'Invalid email or password.'}), 401 #failed login still counts twoards rL
+
 
 
 with app.app_context():
