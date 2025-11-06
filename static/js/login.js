@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
+
     const loginForm = document.getElementById("loginForm");
     const submitBtn = document.getElementById("submitBtn");
     const originalButtonHTML = submitBtn.innerHTML;
@@ -74,10 +75,10 @@ window.addEventListener('pageshow', function (event) {
             submitBtn.innerHTML = 'Login';
         }
         if (loginForm) {
-            loginForm.reset(); // This clears all input fields.
+            loginForm.reset(); 
         }
         if (errorDiv) {
-            errorDiv.textContent = ''; // Clear any stale error messages.
+            errorDiv.textContent = ''; 
         }
     }
 });

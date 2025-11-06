@@ -1,5 +1,3 @@
-// static/js/register.js
-
 document.addEventListener("DOMContentLoaded", function () {
       
     const registerForm = document.getElementById("registerForm");

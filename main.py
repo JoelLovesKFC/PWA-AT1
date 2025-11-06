@@ -12,7 +12,7 @@ app = Flask(__name__)
 limiter = Limiter(
     get_remote_address, # Use the visitor's IP address to track requests
     app=app,
-    default_limits=["200 per day", "50 per hour"], #
+    default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://",  
 )
 
@@ -33,6 +33,16 @@ class User(db.Model):
 
     def __repr__(self):
         return f"User('{self.username}', '{self.email}')"
+    
+
+# class Notes(db.model):
+#     id = db.Column(db.Integer)
+#     user_id = db.Column(db.
+#     title = db.Column(db.
+#     content = db.Column(db.
+#     date_created = db.Column(db.
+#     user_id = db.Column(db.
+
 
 @app.route('/')
 def home():
@@ -119,6 +129,14 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
+
+@app.route("/change_password")
+def change_password(): 
+    pass
+
+@app.route("/forgot_password")
+def forgot_password():
+    pass
 
 
 
