@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", function () {
             data[key] = value;
         });
 
-        fetch("/register", {
+        fetch("/api/register", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

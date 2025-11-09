@@ -70,7 +70,9 @@ def login_required_page(f):
 
 @app.route('/')
 def home():
-    return render_template("register.html")
+    # You need to create a home.html or redirect to login/register
+    # For now, let's redirect to the new register page route
+    return redirect(url_for('register_page'))
 
 # # READ all notes for the logged-in user
 # @app.route("/api/notes", methods=['GET'])
@@ -131,9 +133,13 @@ def home():
 
 #     return jsonify({'status': 'success', 'message': 'Note deleted.'}), 200
 
+@app.route('/register', methods=['GET'])
+def register_page():
+    """This route's only job is to display the register.html template."""
+    return render_template("register.html")
 
     
-@app.route('/register', methods=['POST'])
+@app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
     
