@@ -72,7 +72,8 @@ def login_required_page(f):
 def home():
     # You need to create a home.html or redirect to login/register
     # For now, let's redirect to the new register page route
-    return redirect(url_for('register_page'))
+    # return redirect(url_for('register_page'))
+    return render_template("home.html")
 
 # # READ all notes for the logged-in user
 # @app.route("/api/notes", methods=['GET'])
