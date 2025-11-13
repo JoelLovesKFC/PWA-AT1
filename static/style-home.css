@@ -1,14 +1,12 @@
 /* Import the Poppins font */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
 
-/* Reset */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-/* BACKGROUND GRADIENT - APPLY TO BODY */
 body {
     height: 100vh;
     margin: 0;
@@ -20,14 +18,12 @@ body {
     color: #f8f9fa;
 }
 
-/* Remove white background from hero section */
 .hero {
     background: transparent !important;
 }
 
 
 
-/* NAVBAR */
 .navbar {
     padding: 1.2rem 0;
     
@@ -38,7 +34,6 @@ body {
 }
 
 
-/* HERO SECTION */
 .hero {
     height: 100vh;
     display: flex;
@@ -54,7 +49,6 @@ body {
     color: #e5e5e5;
 }
 
-/* CTA INPUT FORM */
 .cta-form {
     max-width: 550px;
     margin: 0 auto;
@@ -63,8 +57,24 @@ body {
 .cta-input {
     border-radius: 50px;
     padding-left: 20px;
+    border-radius: 8px;
 }
 
+
 .btn-primary {
-    border-radius: 50px;
+    border-radius: 8px;
 }
+
+.hero h1 {
+    margin-bottom: 30px; 
+}
+
+.hero p {
+    margin-bottom: 5px;
+}
+
+.cta-form {
+    margin-top: 20px;
+}
+
+

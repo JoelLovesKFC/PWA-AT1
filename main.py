@@ -63,7 +63,6 @@ def login_required_page(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            # Instead of returning JSON, we redirect to the 'login' route's URL.
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -136,7 +135,6 @@ def home():
 
 @app.route('/register', methods=['GET'])
 def register_page():
-    """This route's only job is to display the register.html template."""
     return render_template("register.html")
 
     
@@ -211,15 +209,26 @@ def login():
     
 
 @app.route("/dashboard")
-@login_required_page  # <-- Apply the new decorator here
+@login_required_page
 def dashboard():
     user = User.query.get(session['user_id'])
     return render_template("dashboard.html", user=user)
+
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+@app.route("/profile")
+@login_required_page
+def profile():
+    user = User.query.get(session["user_id"])
+    if not user:
+        session.clear()
+        return redirect(url_for("login"))
+    return render_template("profile.html", user=user)
+
 
 
 @app.route("/change_password")
