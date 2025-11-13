@@ -76,8 +76,8 @@
         const li = document.createElement('li');
         li.className = 'nav-item d-flex align-items-center';
         li.innerHTML = `
-          <a href="#" class="nav-link flex-grow-1 d-flex align-items-center" data-ws-id="${ws.id}">
-            <i class="bi bi-kanban"></i><span class="ms-1 text-truncate">${ws.name}</span>
+          <a href="/workspaces/${ws.id}" class="nav-link flex-grow-1 d-flex align-items-center" data-ws-id="${ws.id}">
+            <i class="bi bi-kanban"></i><span class="ms-1 text-truncate">${escapeHtml(ws.name)}</span>
           </a>
           <div class="dropend ms-1">
             <button class="btn btn-sm btn-dark" data-bs-toggle="dropdown" aria-expanded="false">
@@ -166,6 +166,8 @@
       return;
     }
   });
+
+  function escapeHtml(s) { return (s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m])) }
 
   ensureModals();
   wireForms();

@@ -8,7 +8,6 @@
         border-radius: .5rem;
         padding: .65rem .75rem;
         margin-bottom: .6rem;
-        /* more spacing between tasks */
         display: flex;
         align-items: flex-start;
         gap: .75rem;
@@ -28,25 +27,19 @@
         color: var(--bs-secondary-color);
     }
 
-    /* status colors */
     .badge-todo {
         background: #6c757d;
     }
 
-    /* gray */
     .badge-progress {
         background: #f1c40f;
         color: #111;
     }
 
-    /* yellow */
     .badge-done {
         background: #2ecc71;
     }
 
-    /* green */
-
-    /* make the checkbox larger and easier to hit */
     .task-check {
         transform: scale(1.25);
         margin-top: .25rem;
@@ -74,6 +67,7 @@
                                 id="flt-done">Done</button>
                         </div>
 
+                        <!-- Removed the top-bar "Edit" button -->
                         <button id="bulkDeleteBtn" class="btn btn-sm btn-danger" disabled>
                             <i class="bi bi-trash me-1"></i>Delete
                         </button>
@@ -129,7 +123,8 @@
                     </div>
                     <div class="mb-2">
                         <label class="form-label">Status</label>
-                        <select class="form-select" id="taskStatus">
+                        <select class="form-select" id="taskStatus" required>
+                            <option value="" selected disabled>Select a status...</option>
                             <option value="todo">To Do</option>
                             <option value="in_progress">In Progress</option>
                             <option value="done">Done</option>

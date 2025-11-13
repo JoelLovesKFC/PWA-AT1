@@ -21,9 +21,9 @@
         done: document.getElementById('flt-done'),
     };
 
-    let currentFilter = 'all';     // keep track to re-load correctly
-    let selected = new Set();      // selected task IDs
-    let lastItems = [];            // cache current tasks for edit modal
+    let currentFilter = 'all';
+    let selected = new Set();
+    let lastItems = [];
 
     function badge(status) {
         switch (status) {
@@ -82,9 +82,10 @@
     async function loadTasks() {
         const res = await fetch('/api/tasks?ts=' + Date.now());
         const items = await res.json();
-        lastItems = items; // cache for edit lookups
+        lastItems = items;
         listEl.innerHTML = items.map(rowTemplate).join('');
         applyFilter();
+        updateBulkButton();
     }
 
     function toggleSelected(id, state) {
@@ -102,6 +103,7 @@
     function openModalForCreate() {
         form.reset();
         fldId.value = '';
+        fldStatus.value = ''; // show placeholder
         document.getElementById('taskModalLabel').textContent = 'New Task';
         bsModal.show();
     }
@@ -126,7 +128,9 @@
             status: fldStatus.value,
             completed: fldStatus.value === 'done'
         };
-        if (!payload.title) return;
+
+        if (!payload.title) { alert('Please enter a title.'); return; }
+        if (!payload.status) { alert('Please select a status for the task.'); return; }
 
         const id = fldId.value;
         const method = id ? 'PUT' : 'POST';
@@ -137,10 +141,13 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        if (!res.ok) { alert('Could not save task'); return; }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            alert(err.message || 'Could not save task');
+            return;
+        }
         bsModal.hide();
-
-        await loadTasks();  // stays on current filter
+        await loadTasks();
     }
 
     // --- bulk delete
@@ -160,13 +167,12 @@
         await loadTasks();
     }
 
-    // === delegated interactions on the task list (edit / delete / checkbox / row click) ===
+    // delegated interactions on the task list
     listEl.addEventListener('click', async (e) => {
         const row = e.target.closest('.task-row');
         if (!row) return;
         const id = Number(row.dataset.id);
 
-        // delete button
         if (e.target.closest('.btn-del')) {
             e.preventDefault(); e.stopPropagation();
             if (!confirm('Delete this task?')) return;
@@ -178,7 +184,6 @@
             return;
         }
 
-        // edit button
         if (e.target.closest('.btn-edit')) {
             e.preventDefault(); e.stopPropagation();
             const t = lastItems.find(x => x.id === id);
@@ -186,14 +191,12 @@
             return;
         }
 
-        // checkbox
         if (e.target.classList.contains('task-check')) {
             e.stopPropagation();
             toggleSelected(id, e.target.checked);
             return;
         }
 
-        // click anywhere on the row toggles the checkbox
         const cb = row.querySelector('.task-check');
         if (cb) {
             cb.checked = !cb.checked;
@@ -210,7 +213,6 @@
     });
 
     // initialise
-    setFilter('all');  // default highlight
+    setFilter('all');
     loadTasks();
 })();
-

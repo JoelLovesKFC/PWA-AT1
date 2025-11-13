@@ -45,14 +45,19 @@ class Note(db.Model):
     title = db.Column(db.String(100), nullable=False)
     content = db.Column(db.Text, nullable=False)
     date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    # note can live inside a workspace
+    workspace_id = db.Column(db.Integer, db.ForeignKey('workspace.id'), nullable=True)
 
     def to_dict(self):
         return {
             'id': self.id,
             'title': self.title,
             'content': self.content,
-            'date_created': self.date_created.isoformat()
+            'date_created': self.date_created.isoformat(),
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'workspace_id': self.workspace_id
         }
 
     def __repr__(self):
@@ -70,6 +75,11 @@ User.workspaces = db.relationship(
     'Workspace', backref='owner', lazy=True, cascade="all, delete-orphan"
 )
 
+# Reverse relation for notes on a workspace
+Workspace.notes = db.relationship(
+    'Note', backref='workspace', lazy=True, cascade="all, delete-orphan"
+)
+
 
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -85,7 +95,6 @@ STATUS_CHOICES = {"todo", "in_progress", "done"}
 
 
 def canonical_status(value: str | None) -> str | None:
-    """Map many possible inputs to our canonical values: todo / in_progress / done."""
     s = (value or "").strip().lower()
     if s in ("todo", "to do", "to_do"):
         return "todo"
@@ -142,6 +151,16 @@ def home():
 @app.route('/register', methods=['GET'])
 def register_page():
     return render_template("register.html")
+
+
+# workspace detail page (notes editor lives here)
+@app.route("/workspaces/<int:ws_id>")
+@login_required_page
+def workspace_detail(ws_id):
+    ws = Workspace.query.get_or_404(ws_id)
+    if ws.user_id != session["user_id"]:
+        return "Forbidden", 403
+    return render_template("workspace.html", ws=ws)
 
 
 # ----------------- AUTH API -----------------
@@ -270,10 +289,9 @@ def api_update_profile_basic():
 @app.route("/api/tasks", methods=["GET"])
 @login_required_page
 def list_tasks():
+    """Single GET handler (duplicate removed)."""
     user_id = session["user_id"]
-    # optional filter: accepts 'todo', 'in_progress', 'done' or the older labels
-    raw = request.args.get("status")
-    st = canonical_status(raw)
+    st = canonical_status(request.args.get("status"))
     q = Task.query.filter_by(user_id=user_id)
     if st in STATUS_CHOICES:
         q = q.filter(Task.status == st)
@@ -298,27 +316,30 @@ def list_tasks():
 def create_task():
     data = request.get_json() or {}
     title = (data.get("title") or "").strip()
-    description = (data.get("description") or "").strip()
-    due_date_str = (data.get("due_date") or "").strip()
-    status = canonical_status(data.get("status"))  # may be None
+    status = canonical_status(data.get("status"))
 
     if not title:
         return jsonify({"status": "error", "message": "Title is required."}), 400
 
-    if status not in STATUS_CHOICES:
-        # back-compat: derive from completed flag; else default todo
-        status = "done" if bool(data.get("completed")) else "todo"
+    # strict status check
+    if not status:
+        return jsonify({
+            "status": "error",
+            "field": "status",
+            "message": "Please select a status for the task."
+        }), 400
 
     due_date = None
-    if due_date_str:
+    dd = (data.get("due_date") or "").strip()
+    if dd:
         try:
-            due_date = datetime.strptime(due_date_str, "%Y-%m-%d").date()
+            due_date = datetime.strptime(dd, "%Y-%m-%d").date()
         except ValueError:
             return jsonify({"status": "error", "message": "Invalid date format. Use YYYY-MM-DD."}), 400
 
     task = Task(
         title=title,
-        description=description or None,
+        description=(data.get("description") or "").strip() or None,
         due_date=due_date,
         status=status,
         completed=(status == "done"),
@@ -346,8 +367,7 @@ def update_task(task_id):
         task.title = title
 
     if "description" in data:
-        desc = (data.get("description") or "").strip()
-        task.description = desc or None
+        task.description = (data.get("description") or "").strip() or None
 
     if "due_date" in data:
         dd = (data.get("due_date") or "").strip()
@@ -361,8 +381,12 @@ def update_task(task_id):
 
     if "status" in data:
         st = canonical_status(data.get("status"))
-        if st not in STATUS_CHOICES:
-            return jsonify({"status": "error", "message": "Invalid status."}), 400
+        if not st:
+            return jsonify({
+                "status": "error",
+                "field": "status",
+                "message": "Please select a valid status."
+            }), 400
         task.status = st
         task.completed = (st == "done")
 
@@ -404,6 +428,80 @@ def bulk_delete_tasks():
     return jsonify({"status": "success", "deleted": deleted}), 200
 
 
+# ----------------- WORKSPACE NOTES API -----------------
+def _ensure_ws_ownership(ws_id: int):
+    ws = Workspace.query.get_or_404(ws_id)
+    if ws.user_id != session["user_id"]:
+        return None
+    return ws
+
+
+@csrf.exempt
+@app.route("/api/workspaces/<int:ws_id>/notes", methods=["GET"])
+@login_required_page
+def api_ws_notes_list(ws_id):
+    ws = _ensure_ws_ownership(ws_id)
+    if ws is None:
+        return jsonify({"status": "error"}), 403
+    notes = (
+        Note.query.filter_by(user_id=session["user_id"], workspace_id=ws_id)
+        .order_by(Note.updated_at.desc())
+        .all()
+    )
+    return jsonify([n.to_dict() for n in notes]), 200
+
+
+@csrf.exempt
+@app.route("/api/workspaces/<int:ws_id>/notes", methods=["POST"])
+@login_required_page
+def api_ws_notes_create(ws_id):
+    ws = _ensure_ws_ownership(ws_id)
+    if ws is None:
+        return jsonify({"status": "error"}), 403
+    data = request.get_json() or {}
+    title = (data.get("title") or "Untitled").strip()
+    content = (data.get("content") or "").strip()
+    note = Note(title=title, content=content, user_id=session["user_id"], workspace_id=ws_id)
+    db.session.add(note)
+    db.session.commit()
+    return jsonify(note.to_dict()), 201
+
+
+@csrf.exempt
+@app.route("/api/workspaces/<int:ws_id>/notes/<int:note_id>", methods=["PUT"])
+@login_required_page
+def api_ws_notes_update(ws_id, note_id):
+    ws = _ensure_ws_ownership(ws_id)
+    if ws is None:
+        return jsonify({"status": "error"}), 403
+    note = Note.query.get_or_404(note_id)
+    if note.user_id != session["user_id"] or note.workspace_id != ws_id:
+        return jsonify({"status": "error"}), 403
+
+    data = request.get_json() or {}
+    if "title" in data:
+        note.title = (data.get("title") or "").strip() or "Untitled"
+    if "content" in data:
+        note.content = (data.get("content") or "")
+    db.session.commit()
+    return jsonify({"status": "success"}), 200
+
+
+@csrf.exempt
+@app.route("/api/workspaces/<int:ws_id>/notes/<int:note_id>", methods=["DELETE"])
+@login_required_page
+def api_ws_notes_delete(ws_id, note_id):
+    ws = _ensure_ws_ownership(ws_id)
+    if ws is None:
+        return jsonify({"status": "error"}), 403
+    note = Note.query.get_or_404(note_id)
+    if note.user_id != session["user_id"] or note.workspace_id != ws_id:
+        return jsonify({"status": "error"}), 403
+    db.session.delete(note)
+    db.session.commit()
+    return jsonify({"status": "success"}), 200
+
+
 # ----------------- OTHER ROUTES -----------------
 @app.route("/logout")
 def logout():
@@ -428,7 +526,7 @@ def change_password_page():
 def api_change_password():
     data = request.get_json() or {}
     current_password = data.get("current_password", "")
-    new_password     = data.get("new_password", "")
+    new_password = data.get("new_password", "")
     confirm_password = data.get("confirm_password", "")
 
     if not all([current_password, new_password, confirm_password]):
@@ -513,21 +611,29 @@ with app.app_context():
     db.create_all()
     # best-effort add/normalize columns for SQLite if table already existed
     try:
-        cols = {row[1] for row in db.session.execute(text("PRAGMA table_info(task)")).all()}
-        if "status" not in cols:
+        # task table
+        cols_task = {row[1] for row in db.session.execute(text("PRAGMA table_info(task)")).all()}
+        if "status" not in cols_task:
             db.session.execute(text("ALTER TABLE task ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'todo'"))
             db.session.commit()
-            # upgrade any completed=1 rows to status='done'
             db.session.execute(text("UPDATE task SET status='done' WHERE completed=1"))
             db.session.commit()
         else:
-            # normalize any old string values to canonical
             db.session.execute(text("UPDATE task SET status='todo' WHERE status IN ('To Do','to do','to_do','')"))
             db.session.execute(text("UPDATE task SET status='in_progress' WHERE status IN ('In Progress','in progress','in_progress')"))
             db.session.execute(text("UPDATE task SET status='done' WHERE status IN ('Done','done','completed')"))
             db.session.commit()
-        if "completed" not in cols:
+        if "completed" not in cols_task:
             db.session.execute(text("ALTER TABLE task ADD COLUMN completed BOOLEAN NOT NULL DEFAULT 0"))
+            db.session.commit()
+
+        # note table
+        cols_note = {row[1] for row in db.session.execute(text("PRAGMA table_info(note)")).all()}
+        if "workspace_id" not in cols_note:
+            db.session.execute(text("ALTER TABLE note ADD COLUMN workspace_id INTEGER"))
+            db.session.commit()
+        if "updated_at" not in cols_note:
+            db.session.execute(text("ALTER TABLE note ADD COLUMN updated_at DATETIME"))
             db.session.commit()
     except Exception:
         pass
