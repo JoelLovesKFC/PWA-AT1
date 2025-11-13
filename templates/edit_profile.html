@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Edit Profile • Nobu{% endblock %}
+
+{% block head_extra %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<style>
+    .card-like {
+        background: #fff;
+        border: 1px solid var(--bs-border-color);
+        border-radius: .5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-8">
+            <div class="p-3 card-like">
+                <h1 class="h5 mb-3">Edit Profile</h1>
+
+                <form id="editProfileForm" class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label">Full Name</label>
+                        <input class="form-control" name="name" value="{{ user.name }}" required>
+                        <div id="name-error" class="text-danger small mt-1"></div>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label">Username</label>
+                        <input class="form-control" name="username" value="{{ user.username }}" required>
+                        <div id="username-error" class="text-danger small mt-1"></div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Email</label>
+                        <input class="form-control" type="email" name="email" value="{{ user.email }}" required>
+                        <div id="email-error" class="text-danger small mt-1"></div>
+                    </div>
+
+                    <div class="col-12 d-flex gap-2 mt-2">
+                        <button type="submit" id="saveBtn" class="btn btn-primary">Save changes</button>
+                        <a href="/profile" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script src="{{ url_for('static', filename='js/profile_basic.js') }}"></script>
+{% endblock %}

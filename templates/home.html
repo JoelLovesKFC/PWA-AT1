@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,40 +11,42 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style-home.css') }}">
 </head>
+
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark">
-    <div class="container">
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
 
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link active" href="/">Home</a></li>
-                <li class="nav-item"><a class="nav-link" href="/login">Login</a></li>
-                <li class="nav-item"><a class="nav-link" href="/register">Register</a></li>
-            </ul>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link active" href="/">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/login">Login</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/register">Register</a></li>
+                </ul>
+            </div>
         </div>
-    </div>
-</nav>
+    </nav>
 
-<section class="hero d-flex align-items-center text-center">
-    <div class="container">
+    <section class="hero d-flex align-items-center text-center">
+        <div class="container">
 
-        <h1 class="display-4 fw-bold">Welcome to Nubo</h1>
-        <p class="lead mb-4">A modern note taking app that provides countless of features.</p>
+            <h1 class="display-4 fw-bold">Welcome to Nobu</h1>
+            <p class="lead mb-4">A modern note taking app that provides countless of features.</p>
 
-        <form action="/register" class="cta-form d-flex justify-content-center">
-            <input type="email" class="form-control form-control-lg cta-input" placeholder="Enter your email…">
-            <button type="submit" class="btn btn-lg btn-primary ms-2">Get Started</button>
-        </form>
+            <form action="/register" class="cta-form d-flex justify-content-center">
+                <input type="email" class="form-control form-control-lg cta-input" placeholder="Enter your email…">
+                <button type="submit" class="btn btn-lg btn-primary ms-2">Get Started</button>
+            </form>
 
-    </div>
-</section>
+        </div>
+    </section>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 </body>
+
 </html>
