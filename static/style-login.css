@@ -1,73 +1,106 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
 
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Poppins', sans-serif;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Poppins', sans-serif;
 }
 
 body {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    background: linear-gradient(135deg, #72889b, #37374b);
-    color: #333;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #72889b, #37374b);
+  color: #333;
 }
 
 .form-box {
-    width: 100%;
-    max-width: 400px;
-    padding: 40px;
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 400px;
+  padding: 40px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 
 h2 {
-    font-size: 30px;
-    text-align: left;
-    margin-bottom: 25px;
-    font-weight: 600;
+  font-size: 30px;
+  text-align: left;
+  margin-bottom: 25px;
+  font-weight: 600;
 }
 
 input {
-    width: 100%;
-    padding: 12px;
-    background: #fff;
-    border-radius: 6px;
-    border: 1px solid #ced4da;
-    outline: none;
-    font-size: 16px;
-    color: #333;
-    margin-bottom: 20px;
+  width: 100%;
+  padding: 12px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #ced4da;
+  outline: none;
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 20px;
 }
 
 .form-control {
-    background-color: #fff;
-    border: 1px solid #ced4da;
+  background-color: #fff;
+  border: 1px solid #ced4da;
 }
 
 button {
-    width: 100%;
-    padding: 12px;
-    background: #0d6efd;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-    color: #fff;
-    font-weight: 500;
-    margin-bottom: 20px;
-    transition: 0.5s;
+  width: 100%;
+  padding: 12px;
+  background: #0d6efd;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: #fff;
+  font-weight: 500;
+  margin-bottom: 20px;
+  transition: 0.5s;
 }
 
 button:hover {
-    background: #0b5ed7;
+  background: #0b5ed7;
 }
 
 p {
-    font-size: 14px;
-    text-align: left;
+  font-size: 14px;
+  text-align: left;
+}
+
+/* ===== Password eye toggle ===== */
+.password-wrap {
+  position: relative;
+}
+
+.password-wrap input {
+  padding-right: 2.6rem; /* room for the eye button */
+}
+
+.password-wrap .toggle-pass {
+  position: absolute;
+  right: .5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: 0;
+  color: rgba(0,0,0,.55);
+  padding: .25rem;
+  border-radius: .35rem;
+  line-height: 1;
+  width: 2rem;
+  height: 2rem;
+}
+
+.password-wrap .toggle-pass .bi {
+  font-size: 1rem;
+}
+
+.password-wrap .toggle-pass:focus {
+  outline: none;
+  box-shadow: 0 0 0 .2rem rgba(13,110,253,.25);
 }
