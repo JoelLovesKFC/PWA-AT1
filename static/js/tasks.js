@@ -2,8 +2,9 @@
     const listEl = document.getElementById('taskList');
     const newBtn = document.getElementById('newTaskBtn');
     const delBtn = document.getElementById('bulkDeleteBtn');
+    const filterLabel = document.getElementById('filterLabel');
 
-    // modal bits
+    // Modal elements
     const modalEl = document.getElementById('taskModal');
     const bsModal = new bootstrap.Modal(modalEl);
     const form = document.getElementById('taskForm');
@@ -13,43 +14,44 @@
     const fldDue = document.getElementById('taskDue');
     const fldStatus = document.getElementById('taskStatus');
 
-    // filter buttons
-    const fltBtns = {
-        all: document.getElementById('flt-all'),
-        todo: document.getElementById('flt-todo'),
-        in_progress: document.getElementById('flt-progress'),
-        done: document.getElementById('flt-done'),
-    };
-
+    // State
     let currentFilter = 'all';
     let selected = new Set();
     let lastItems = [];
 
-    function badge(status) {
+    function getStatusMeta(status) {
         switch (status) {
-            case 'done': return `<span class="badge rounded-pill badge-done">Done</span>`;
-            case 'in_progress': return `<span class="badge rounded-pill badge-progress">In&nbsp;Progress</span>`;
-            default: return `<span class="badge rounded-pill badge-todo">To&nbsp;Do</span>`;
+            case 'done': return { label: 'Done', badgeClass: 'bg-success', rowClass: 'status-done' };
+            case 'in_progress': return { label: 'In Progress', badgeClass: 'bg-warning text-dark', rowClass: 'status-inprogress' };
+            default: return { label: 'To Do', badgeClass: 'bg-secondary', rowClass: 'status-todo' };
         }
     }
 
     function rowTemplate(t) {
-        const status = t.status || (t.completed ? 'done' : 'todo');
-        const due = t.due_date ? ` <span class="task-meta ms-2">Due ${t.due_date}</span>` : '';
-        const checked = selected.has(t.id) ? 'checked' : '';
+        const rawStatus = t.status || (t.completed ? 'done' : 'todo');
+        const meta = getStatusMeta(rawStatus);
+        const due = t.due_date ? `<span class="ms-2 text-muted"><i class="bi bi-calendar-event me-1"></i>${t.due_date}</span>` : '';
+
+        const isSelected = selected.has(t.id);
+        const checkedAttr = isSelected ? 'checked' : '';
+        const selectionClass = isSelected ? 'selected-row' : '';
+
         return `
-      <div class="task-row" data-id="${t.id}" data-status="${status}">
-        <input type="checkbox" class="form-check-input task-check" ${checked} />
-        <div class="flex-grow-1">
-          <div class="d-flex align-items-center gap-2">
+      <div class="task-row ${meta.rowClass} ${selectionClass}" data-id="${t.id}" data-status="${rawStatus}">
+        <input type="checkbox" class="form-check-input task-check mt-1" ${checkedAttr} />
+        <div class="flex-grow-1 ms-2">
+          <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
             <span class="task-title">${escapeHtml(t.title)}</span>
-            ${badge(status)} ${due}
+            <span class="badge ${meta.badgeClass} badge-status rounded-pill">${meta.label}</span>
           </div>
-          ${t.description ? `<div class="task-meta mt-1">${escapeHtml(t.description)}</div>` : ''}
+          <div class="task-meta">
+            ${t.description ? `<span class="me-2">${escapeHtml(t.description)}</span>` : ''}
+            ${due}
+          </div>
         </div>
-        <div class="d-flex align-items-start gap-2">
-          <button class="btn btn-sm btn-outline-secondary btn-edit" title="Edit"><i class="bi bi-pencil"></i></button>
-          <button class="btn btn-sm btn-outline-danger btn-del" title="Delete"><i class="bi bi-trash"></i></button>
+        <div class="d-flex align-items-center gap-1">
+          <button class="btn btn-sm btn-light text-secondary btn-edit" title="Edit"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-sm btn-light text-danger btn-del" title="Delete"><i class="bi bi-trash"></i></button>
         </div>
       </div>`;
     }
@@ -58,34 +60,42 @@
         return (s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
     }
 
-    function setFilter(newFilter) {
+    function setFilter(newFilter, labelText) {
         currentFilter = newFilter;
-        Object.entries(fltBtns).forEach(([k, btn]) => {
-            if (k === newFilter) {
-                btn.classList.remove('btn-outline-secondary');
-                btn.classList.add('btn-secondary');
-            } else {
-                btn.classList.add('btn-outline-secondary');
-                btn.classList.remove('btn-secondary');
-            }
-        });
+        filterLabel.textContent = labelText;
         applyFilter();
     }
 
     function applyFilter() {
+        let visibleCount = 0;
         [...listEl.querySelectorAll('.task-row')].forEach(row => {
             const st = row.dataset.status;
-            row.style.display = (currentFilter === 'all' || st === currentFilter) ? '' : 'none';
+            const show = (currentFilter === 'all' || st === currentFilter);
+            row.style.display = show ? 'flex' : 'none';
+            if (show) visibleCount++;
         });
+
+        // Optional: Show empty state if filter matches nothing
+        if (visibleCount === 0 && listEl.children.length > 0) {
+            // You could add an empty state message here if desired
+        }
     }
 
     async function loadTasks() {
-        const res = await fetch('/api/tasks?ts=' + Date.now());
-        const items = await res.json();
-        lastItems = items;
-        listEl.innerHTML = items.map(rowTemplate).join('');
-        applyFilter();
-        updateBulkButton();
+        try {
+            const res = await fetch('/api/tasks?ts=' + Date.now());
+            const items = await res.json();
+            lastItems = items;
+            if (items.length === 0) {
+                listEl.innerHTML = `<div class="text-center py-5 text-muted"><i class="bi bi-clipboard-check display-4"></i><p class="mt-2">No tasks found. Create one!</p></div>`;
+            } else {
+                listEl.innerHTML = items.map(rowTemplate).join('');
+            }
+            applyFilter();
+            updateBulkButton();
+        } catch (e) {
+            console.error(e);
+        }
     }
 
     function toggleSelected(id, state) {
@@ -96,26 +106,69 @@
 
     function updateBulkButton() {
         delBtn.disabled = selected.size === 0;
-        delBtn.innerHTML = `<i class="bi bi-trash me-1"></i>Delete${selected.size ? ` (${selected.size})` : ''}`;
+        delBtn.innerHTML = `<i class="bi bi-trash"></i> ${selected.size ? `(${selected.size})` : ''}`;
     }
 
-    // --- modal handling
+    // --- Row Interaction ---
+    listEl.addEventListener('click', (e) => {
+        const row = e.target.closest('.task-row');
+        if (!row) return;
+        const id = Number(row.dataset.id);
+        const checkbox = row.querySelector('.task-check');
+
+        if (e.target.closest('.btn-del')) {
+            e.preventDefault(); e.stopPropagation();
+            openDeleteModalForSingle(id);
+            return;
+        }
+        if (e.target.closest('.btn-edit')) {
+            e.preventDefault(); e.stopPropagation();
+            const t = lastItems.find(x => x.id === id);
+            openModalForEdit(t);
+            return;
+        }
+
+        // Checkbox click
+        if (e.target.classList.contains('task-check')) {
+            e.stopPropagation();
+            const isChecked = e.target.checked;
+            toggleSelected(id, isChecked);
+            if (isChecked) row.classList.add('selected-row');
+            else row.classList.remove('selected-row');
+            return;
+        }
+
+        // Row click (toggle)
+        const newState = !checkbox.checked;
+        checkbox.checked = newState;
+        toggleSelected(id, newState);
+        if (newState) row.classList.add('selected-row');
+        else row.classList.remove('selected-row');
+    });
+
+    // --- Modals ---
     function openModalForCreate() {
         form.reset();
         fldId.value = '';
-        fldStatus.value = ''; // show placeholder
+
+        // FIX 1: If current filter is specific (e.g. "done"), default the new task status to "done"
+        if (['todo', 'in_progress', 'done'].includes(currentFilter)) {
+            fldStatus.value = currentFilter;
+        } else {
+            fldStatus.value = 'todo';
+        }
+
         document.getElementById('taskModalLabel').textContent = 'New Task';
         bsModal.show();
     }
 
     function openModalForEdit(t) {
-        if (!t) return;
         form.reset();
         fldId.value = t.id;
         fldTitle.value = t.title || '';
         fldDesc.value = t.description || '';
         fldDue.value = t.due_date || '';
-        fldStatus.value = t.status || (t.completed ? 'done' : 'todo');
+        fldStatus.value = t.status || 'todo';
         document.getElementById('taskModalLabel').textContent = 'Edit Task';
         bsModal.show();
     }
@@ -125,94 +178,77 @@
             title: fldTitle.value.trim(),
             description: fldDesc.value.trim(),
             due_date: fldDue.value || null,
-            status: fldStatus.value,
-            completed: fldStatus.value === 'done'
+            status: fldStatus.value || 'todo'
         };
-
-        if (!payload.title) { alert('Please enter a title.'); return; }
-        if (!payload.status) { alert('Please select a status for the task.'); return; }
+        if (!payload.title) return showToast('Title is required.');
 
         const id = fldId.value;
         const method = id ? 'PUT' : 'POST';
         const url = id ? `/api/tasks/${id}` : '/api/tasks';
 
         const res = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         });
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            alert(err.message || 'Could not save task');
-            return;
-        }
-        bsModal.hide();
-        await loadTasks();
-    }
 
-    // --- bulk delete
-    async function bulkDelete() {
-        if (selected.size === 0) return;
-        if (!confirm(`Delete ${selected.size} selected task(s)?`)) return;
+        if (res.ok) {
+            bsModal.hide();
 
-        const ids = [...selected];
-        const res = await fetch('/api/tasks/bulk_delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids })
-        });
-        if (!res.ok) { alert('Bulk delete failed.'); return; }
-        selected.clear();
-        updateBulkButton();
-        await loadTasks();
-    }
+            // FIX 2: If the new task status doesn't match the current filter, switch filter to 'All'
+            // so the user sees the new task immediately.
+            if (currentFilter !== 'all' && payload.status !== currentFilter) {
+                setFilter('all', 'All');
+            }
 
-    // delegated interactions on the task list
-    listEl.addEventListener('click', async (e) => {
-        const row = e.target.closest('.task-row');
-        if (!row) return;
-        const id = Number(row.dataset.id);
-
-        if (e.target.closest('.btn-del')) {
-            e.preventDefault(); e.stopPropagation();
-            if (!confirm('Delete this task?')) return;
-            const resp = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
-            if (!resp.ok) { alert('Could not delete task.'); return; }
-            selected.delete(id);
-            updateBulkButton();
             await loadTasks();
-            return;
         }
+    }
 
-        if (e.target.closest('.btn-edit')) {
-            e.preventDefault(); e.stopPropagation();
-            const t = lastItems.find(x => x.id === id);
-            openModalForEdit(t);
-            return;
-        }
+    // Delete Logic
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteTaskModal'));
+    const deleteModalBody = document.getElementById('deleteModalBody');
+    const deleteTaskIdFld = document.getElementById('deleteTaskId');
+    const deleteIsBulkFld = document.getElementById('deleteIsBulk');
 
-        if (e.target.classList.contains('task-check')) {
-            e.stopPropagation();
-            toggleSelected(id, e.target.checked);
-            return;
-        }
+    function openDeleteModalForSingle(id) {
+        deleteModalBody.textContent = 'Delete this task?';
+        deleteTaskIdFld.value = id;
+        deleteIsBulkFld.value = 'false';
+        deleteModal.show();
+    }
 
-        const cb = row.querySelector('.task-check');
-        if (cb) {
-            cb.checked = !cb.checked;
-            toggleSelected(id, cb.checked);
-        }
+    document.getElementById('bulkDeleteBtn').addEventListener('click', () => {
+        if (!selected.size) return;
+        deleteModalBody.textContent = `Delete ${selected.size} tasks?`;
+        deleteIsBulkFld.value = 'true';
+        deleteModal.show();
     });
 
-    // wire up UI
+    document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+        const isBulk = deleteIsBulkFld.value === 'true';
+        if (isBulk) {
+            await fetch('/api/tasks/bulk_delete', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: [...selected] })
+            });
+            selected.clear();
+        } else {
+            const id = deleteTaskIdFld.value;
+            await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+            selected.delete(Number(id));
+        }
+        deleteModal.hide();
+        await loadTasks();
+    });
+
+    // Init
     newBtn.addEventListener('click', openModalForCreate);
     document.getElementById('saveTaskBtn').addEventListener('click', saveFromModal);
-    delBtn.addEventListener('click', bulkDelete);
-    Object.values(fltBtns).forEach(btn => {
-        btn.addEventListener('click', () => setFilter(btn.dataset.filter));
+    document.querySelectorAll('.dropdown-item[data-filter]').forEach(l => {
+        l.addEventListener('click', (e) => {
+            e.preventDefault();
+            setFilter(e.target.dataset.filter, e.target.textContent);
+        });
     });
 
-    // initialise
-    setFilter('all');
     loadTasks();
 })();

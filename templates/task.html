@@ -4,22 +4,50 @@
 {% block head_extra %}
 <style>
     .task-row {
+        background: #fff;
         border: 1px solid var(--bs-border-color);
+        border-left-width: 5px;
         border-radius: .5rem;
-        padding: .65rem .75rem;
-        margin-bottom: .6rem;
+        padding: .8rem 1rem;
+        margin-bottom: .75rem;
         display: flex;
         align-items: flex-start;
         gap: .75rem;
+        transition: all 0.2s ease;
+        cursor: pointer;
     }
 
     .task-row:hover {
-        background: var(--bs-body-bg);
-        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04);
+        transform: translateY(-1px);
+    }
+
+    .task-row.selected-row {
+        background-color: #f0f8ff;
+        border-color: #0d6efd;
+    }
+
+    .task-row.status-todo {
+        border-left-color: #6c757d;
+    }
+
+    .task-row.status-inprogress {
+        border-left-color: #ffc107;
+    }
+
+    .task-row.status-done {
+        border-left-color: #198754;
+        opacity: 0.85;
     }
 
     .task-title {
         font-weight: 600;
+        color: #212529;
+    }
+
+    .status-done .task-title {
+        text-decoration: line-through;
+        color: #6c757d;
     }
 
     .task-meta {
@@ -27,23 +55,16 @@
         color: var(--bs-secondary-color);
     }
 
-    .badge-todo {
-        background: #6c757d;
-    }
-
-    .badge-progress {
-        background: #f1c40f;
-        color: #111;
-    }
-
-    .badge-done {
-        background: #2ecc71;
-    }
-
     .task-check {
-        transform: scale(1.25);
+        transform: scale(1.2);
         margin-top: .25rem;
         cursor: pointer;
+    }
+
+    .badge-status {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 </style>
 {% endblock %}
@@ -51,25 +72,30 @@
 {% block content %}
 <div class="row g-3 mt-3">
     <div class="col-12 col-xl-9">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between mb-3">
-                    <h1 class="h5 mb-0">Tasks</h1>
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <h1 class="h4 mb-0 fw-bold text-dark">Tasks</h1>
 
                     <div class="d-flex align-items-center gap-2">
-                        <div class="btn-group me-2" role="group" aria-label="Filter">
-                            <button class="btn btn-sm btn-secondary" data-filter="all" id="flt-all">All</button>
-                            <button class="btn btn-sm btn-outline-secondary" data-filter="todo" id="flt-todo">To
-                                Do</button>
-                            <button class="btn btn-sm btn-outline-secondary" data-filter="in_progress"
-                                id="flt-progress">In Progress</button>
-                            <button class="btn btn-sm btn-outline-secondary" data-filter="done"
-                                id="flt-done">Done</button>
+                        <div class="dropdown">
+                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown">
+                                <i class="bi bi-filter"></i> Filter: <span id="filterLabel" class="fw-bold">All</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="#" data-filter="all">All Tasks</a></li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                                <li><a class="dropdown-item" href="#" data-filter="todo">To Do</a></li>
+                                <li><a class="dropdown-item" href="#" data-filter="in_progress">In Progress</a></li>
+                                <li><a class="dropdown-item" href="#" data-filter="done">Done</a></li>
+                            </ul>
                         </div>
 
-                        <!-- Removed the top-bar "Edit" button -->
                         <button id="bulkDeleteBtn" class="btn btn-sm btn-danger" disabled>
-                            <i class="bi bi-trash me-1"></i>Delete
+                            <i class="bi bi-trash"></i>
                         </button>
                         <button id="newTaskBtn" class="btn btn-sm btn-primary">
                             <i class="bi bi-plus-lg me-1"></i>New Task
@@ -82,61 +108,80 @@
         </div>
     </div>
 
-    <!-- right rail -->
     <div class="col-12 col-xl-3">
-        <div class="card shadow-sm">
+        <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h2 class="h6">Shortcuts</h2>
+                <h2 class="h6 fw-bold text-secondary mb-3">Quick Links</h2>
                 <div class="d-grid gap-2">
-                    <a href="/dashboard" class="btn btn-outline-primary btn-sm"><i
-                            class="bi bi-speedometer2 me-1"></i>Go to Dashboard</a>
-                    <a href="/profile" class="btn btn-outline-secondary btn-sm"><i
-                            class="bi bi-person me-1"></i>Profile</a>
+                    <a href="/dashboard" class="btn btn-light btn-sm text-start"><i
+                            class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+                    <a href="/profile" class="btn btn-light btn-sm text-start"><i
+                            class="bi bi-person me-2"></i>Profile</a>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- New/Edit modal -->
-<div class="modal fade" id="taskModal" tabindex="-1" aria-labelledby="taskModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<!-- New/Edit Modal -->
+<div class="modal fade" id="taskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="taskModalLabel">New Task</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="taskForm">
                     <input type="hidden" id="taskId">
                     <div class="mb-3">
-                        <label class="form-label">Title</label>
-                        <input class="form-control" id="taskTitle" required>
+                        <label class="form-label fw-bold small">Title</label>
+                        <input class="form-control" id="taskTitle" placeholder="What needs to be done?" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Description</label>
+                        <label class="form-label fw-bold small">Description</label>
                         <textarea class="form-control" id="taskDesc" rows="3"></textarea>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Due date</label>
-                        <input type="date" class="form-control" id="taskDue">
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Status</label>
-                        <select class="form-select" id="taskStatus" required>
-                            <option value="" selected disabled>Select a status...</option>
-                            <option value="todo">To Do</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="done">Done</option>
-                        </select>
-                        <div class="form-text">If your DB doesn’t yet have a status column, “To Do/Done” will still work
-                            (we’ll derive it from completed).</div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-bold small">Due Date</label>
+                            <input type="date" class="form-control" id="taskDue">
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-bold small">Status</label>
+                            <select class="form-select" id="taskStatus">
+                                <option value="todo">To Do</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="done">Done</option>
+                            </select>
+                        </div>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button id="saveTaskBtn" class="btn btn-primary">Save</button>
+            <div class="modal-footer bg-light">
+                <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button id="saveTaskBtn" class="btn btn-primary btn-sm px-4">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation -->
+<div class="modal fade" id="deleteTaskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteModalBody" class="mb-0"></p>
+                <input type="hidden" id="deleteTaskId">
+                <input type="hidden" id="deleteIsBulk" value="false">
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="confirmDeleteBtn" class="btn btn-danger btn-sm">Delete</button>
             </div>
         </div>
     </div>

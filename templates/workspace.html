@@ -1,99 +1,495 @@
 {% extends "base.html" %}
-{% block title %}Workspace • {{ ws.name }}{% endblock %}
+{% block title %}{{ ws.name }}{% endblock %}
 
 {% block head_extra %}
 <meta name="csrf-token" content="{{ csrf_token() }}">
+<!-- Editor.js and Plugins -->
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/editorjs@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/header@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/list@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/embed@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/delimiter@latest"></script>
+
 <style>
-    .ws-wrap {
-        margin-top: 1rem
-    }
-
-    .ws-card {
-        background: #fff;
-        border: 1px solid var(--bs-border-color);
-        border-radius: .5rem
-    }
-
-    .notes-list {
-        max-height: calc(100vh - 180px);
-        overflow: auto
-    }
-
-    .note-item {
-        padding: .6rem .75rem;
-        border-bottom: 1px solid var(--bs-border-color);
-        cursor: pointer
-    }
-
-    .note-item.active {
-        background: #f6f7f9
-    }
-
-    .note-item h6 {
-        margin: 0;
-        font-size: .95rem
-    }
-
-    .note-item small {
-        color: var(--bs-secondary-color)
-    }
-
-    .editor-header {
+    /* --- Layout --- */
+    .app-container {
         display: flex;
-        gap: .5rem;
-        align-items: center
+        height: calc(100vh - 54px);
+        /* Minus navbar */
+        overflow: hidden;
     }
 
-    .editor-title {
-        font-size: 1rem
+    /* Sidebar */
+    .ws-sidebar {
+        width: 260px;
+        background: #f7f7f5;
+        border-right: 1px solid #e0e0e0;
+        display: flex;
+        flex-direction: column;
+        padding: 1rem 0;
+        z-index: 10;
     }
 
-    .editor-area {
-        min-height: 55vh;
-        border: 1px solid var(--bs-border-color);
-        border-radius: .5rem;
-        padding: .75rem
+    /* Main Document Area */
+    .document-area {
+        flex: 1;
+        background: #ffffff;
+        overflow-y: auto;
+        padding-bottom: 100px;
+        position: relative;
     }
 
-    .status-dot {
-        font-size: .75rem
+    .editor-container {
+        max-width: 850px;
+        margin: 0 auto;
+        padding: 4rem 3rem;
+    }
+
+    /* --- Sidebar List Items --- */
+    .notes-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 8px 4px 16px;
+        font-size: 0.9rem;
+        color: #444;
+        cursor: default;
+        border-left: 3px solid transparent;
+        height: 36px;
+        position: relative;
+    }
+
+    .notes-list-item:hover {
+        background: #e8e8e6;
+    }
+
+    .notes-list-item.active {
+        background: #e8e8e6;
+        font-weight: 600;
+        border-left-color: #333;
+    }
+
+    .note-title-span {
+        flex-grow: 1;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-right: 8px;
+        padding-top: 2px;
+    }
+
+    /* Inline Rename Input */
+    .rename-input {
+        flex-grow: 1;
+        margin-right: 8px;
+        font-size: 0.9rem;
+        padding: 0 6px;
+        border: 1px solid #e0e0e0;
+        background: #ffffff;
+        border-radius: 3px;
+        outline: none;
+        height: 28px;
+        color: #333;
+    }
+
+    .rename-input:focus {
+        border-color: #bbb;
+    }
+
+    /* 3-Dot Button */
+    .note-options-btn {
+        background: transparent;
+        border: none;
+        color: #999;
+        border-radius: 4px;
+        padding: 2px 4px;
+        font-size: 1.1rem;
+        line-height: 0.5;
+        opacity: 0;
+        transition: opacity 0.2s;
+        height: 24px;
+        width: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .notes-list-item:hover .note-options-btn,
+    .dropdown.show .note-options-btn {
+        opacity: 1;
+    }
+
+    .note-options-btn:hover {
+        background: #d0d0cf;
+        color: #333;
+    }
+
+    /* Dropdown Menu Fixes */
+    .dropdown-menu {
+        z-index: 9999 !important;
+        font-size: 0.85rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .sidebar-header {
+        padding: 0 16px 10px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .trash-btn {
+        margin-top: auto;
+        padding: 10px 16px;
+        color: #666;
+        cursor: pointer;
+        font-size: 0.9rem;
+        border-top: 1px solid #eee;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .trash-btn:hover {
+        background: #e8e8e6;
+        color: #333;
+    }
+
+    /* --- Editor --- */
+    #docTitleInput {
+        width: 100%;
+        border: none;
+        outline: none;
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #222;
+        margin-bottom: 1.5rem;
+        background: transparent;
+        font-family: 'Inter', sans-serif;
+    }
+
+    #docTitleInput::placeholder {
+        color: #ddd;
+    }
+
+    .ce-block__content {
+        max-width: 100%;
+    }
+
+    #saveStatus {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        font-size: 0.8rem;
+        color: #aaa;
+        background: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        border: 1px solid #eee;
+    }
+
+    .trash-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #eee;
+    }
+
+    .trash-item:last-child {
+        border-bottom: none;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid ws-wrap" id="wsRoot" data-ws-id="{{ ws.id }}" data-csrf="{{ csrf_token() }}">
-    <div class="row g-3">
-        <div class="col-12 col-lg-3">
-            <div class="ws-card p-2">
-                <div class="d-flex justify-content-between align-items-center px-2 py-2">
-                    <h2 class="h6 mb-0">Notes in “{{ ws.name }}”</h2>
-                    <button id="newNoteBtn" class="btn btn-sm btn-primary">
-                        <i class="bi bi-plus-lg me-1"></i>New
-                    </button>
-                </div>
-                <div id="notesList" class="notes-list"></div>
-            </div>
+<div class="app-container">
+
+    <!-- Inner Sidebar -->
+    <div class="ws-sidebar">
+        <div class="sidebar-header">
+            <span>Pages</span>
+            <button class="btn btn-sm btn-link text-secondary p-0" id="createNoteBtn">
+                <i class="bi bi-plus-lg"></i>
+            </button>
+        </div>
+        <div id="notesListWrapper" style="overflow-y: auto;">
+            <!-- Notes injected here via JS -->
         </div>
 
-        <div class="col-12 col-lg-9">
-            <div class="ws-card p-3">
-                <div class="editor-header mb-2">
-                    <input id="noteTitle" class="form-control editor-title" placeholder="Untitled">
-                    <div class="ms-auto small text-secondary" id="saveState">
-                        <span class="status-dot">●</span> Idle
-                    </div>
-                    <button id="deleteNoteBtn" class="btn btn-sm btn-outline-danger d-none">
-                        <i class="bi bi-trash me-1"></i>Delete
-                    </button>
-                </div>
-                <textarea id="noteBody" class="form-control editor-area" placeholder="Start typing…"></textarea>
+        <div class="trash-btn" onclick="openTrashModal()">
+            <i class="bi bi-trash3"></i> Trash
+        </div>
+    </div>
+
+    <!-- Writable Page Area -->
+    <div class="document-area" id="documentArea">
+        <div id="saveStatus">Saved</div>
+
+        <div class="editor-container">
+            <input type="text" id="docTitleInput" placeholder="Untitled" autocomplete="off">
+            <div id="editorjs"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Trash Modal -->
+<div class="modal fade" id="trashModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-trash3 me-2"></i>Trash</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="trashList" class="text-muted small text-center">Loading...</div>
             </div>
         </div>
     </div>
 </div>
+
+<div id="wsData" data-ws-id="{{ ws.id }}"></div>
 {% endblock %}
 
 {% block scripts_extra %}
-<script src="{{ url_for('static', filename='js/workspace_notes.js') }}"></script>
+<script>
+    const WS_ID = document.getElementById('wsData').dataset.wsId;
+    const notesListEl = document.getElementById('notesListWrapper');
+    const titleInput = document.getElementById('docTitleInput');
+    const statusEl = document.getElementById('saveStatus');
+    const trashModalEl = document.getElementById('trashModal');
+    const trashModal = new bootstrap.Modal(trashModalEl);
+
+    let editor;
+    let currentNoteId = null;
+    let saveTimeout;
+
+    // --- 1. Initialize Editor.js ---
+    function initEditor(initialData) {
+        if (editor) {
+            try { editor.destroy(); } catch (e) { }
+        }
+        let contentData = {};
+        try {
+            contentData = typeof initialData === 'string' ? JSON.parse(initialData) : initialData;
+        } catch (e) { }
+
+        editor = new EditorJS({
+            holder: 'editorjs',
+            data: contentData,
+            placeholder: 'Type something...',
+            tools: {
+                header: { class: Header, config: { levels: [2, 3, 4], defaultLevel: 2 } },
+                list: { class: List, inlineToolbar: true },
+                embed: { class: Embed },
+                delimiter: Delimiter,
+            },
+            onChange: () => { triggerAutoSave(); }
+        });
+    }
+
+    // --- 2. Load Note Logic ---
+    async function loadNote(id) {
+        if (document.querySelector('.rename-input')) {
+            await refreshSidebar();
+        }
+
+        currentNoteId = id;
+        document.querySelectorAll('.notes-list-item').forEach(el => el.classList.remove('active'));
+        const activeItem = document.querySelector(`.notes-list-item[data-id="${id}"]`);
+        if (activeItem) activeItem.classList.add('active');
+
+        try {
+            const res = await fetch(`/api/notes/${id}`);
+            if (!res.ok) throw new Error("Failed to load");
+            const note = await res.json();
+            titleInput.value = note.title;
+            initEditor(note.content);
+        } catch (err) { console.error(err); }
+    }
+
+    // --- 3. Sidebar Logic ---
+    async function refreshSidebar() {
+        const res = await fetch(`/api/workspaces/${WS_ID}/notes`);
+        const notes = await res.json();
+
+        notesListEl.innerHTML = notes.map(n => `
+            <div class="notes-list-item ${currentNoteId === n.id ? 'active' : ''}" data-id="${n.id}" id="note-row-${n.id}">
+                <span class="note-title-span" onclick="loadNote(${n.id})">
+                    <i class="bi bi-file-text me-2 text-secondary"></i>${escapeHtml(n.title || 'Untitled')}
+                </span>
+                
+                <div class="dropdown">
+                    <button class="note-options-btn" type="button" 
+                            data-bs-toggle="dropdown" 
+                            data-bs-boundary="viewport" 
+                            data-bs-popper-config='{"strategy":"fixed"}'>
+                        <i class="bi bi-three-dots"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <li><button class="dropdown-item small" onclick="enableInlineRename(${n.id}, '${escapeHtml(n.title || 'Untitled')}')">
+                            <i class="bi bi-pencil me-2"></i>Rename
+                        </button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button class="dropdown-item small text-danger" onclick="softDeleteNote(${n.id})">
+                            <i class="bi bi-trash me-2"></i>Delete
+                        </button></li>
+                    </ul>
+                </div>
+            </div>
+        `).join('');
+
+        if (currentNoteId && !notes.find(n => n.id === currentNoteId)) {
+            if (notes.length > 0) loadNote(notes[0].id);
+            else { currentNoteId = null; titleInput.value = ""; if (editor) editor.clear(); }
+        } else if (!currentNoteId && notes.length > 0) {
+            loadNote(notes[0].id);
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return text;
+        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    // --- 4. Inline Rename Logic ---
+    function enableInlineRename(id, currentTitle) {
+        const row = document.getElementById(`note-row-${id}`);
+        if (!row) return;
+
+        const titleSpan = row.querySelector('.note-title-span');
+        const dropdownDiv = row.querySelector('.dropdown');
+
+        titleSpan.style.display = 'none';
+        dropdownDiv.style.display = 'none';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentTitle === 'Untitled' ? '' : currentTitle;
+        input.className = 'rename-input';
+        input.placeholder = 'Page Name';
+
+        row.insertBefore(input, dropdownDiv);
+        input.focus();
+
+        const saveRename = async () => {
+            const newTitle = input.value.trim() || 'Untitled';
+
+            input.remove();
+            titleSpan.innerHTML = `<i class="bi bi-file-text me-2 text-secondary"></i>${escapeHtml(newTitle)}`;
+            titleSpan.style.display = '';
+            dropdownDiv.style.display = '';
+
+            await fetch(`/api/notes/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+                body: JSON.stringify({ title: newTitle })
+            });
+
+            if (currentNoteId === id) {
+                titleInput.value = newTitle;
+            }
+        };
+
+        input.addEventListener('blur', saveRename);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                input.blur();
+            }
+        });
+    }
+
+    // --- 5. Standard Logic ---
+    document.getElementById('createNoteBtn').addEventListener('click', async () => {
+        const res = await fetch(`/api/workspaces/${WS_ID}/notes`, {
+            method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
+        });
+        const newNote = await res.json();
+        await refreshSidebar();
+        loadNote(newNote.id);
+    });
+
+    function triggerAutoSave() {
+        statusEl.innerText = 'Saving...';
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(async () => {
+            if (!currentNoteId || !editor) return;
+            const savedData = await editor.save();
+            await fetch(`/api/notes/${currentNoteId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+                body: JSON.stringify({ title: titleInput.value, content: savedData })
+            });
+            statusEl.innerText = 'Saved';
+            const titleSpan = document.querySelector(`.notes-list-item[data-id="${currentNoteId}"] .note-title-span`);
+            if (titleSpan && titleSpan.style.display !== 'none') {
+                titleSpan.innerHTML = `<i class="bi bi-file-text me-2 text-secondary"></i>${escapeHtml(titleInput.value || 'Untitled')}`;
+            }
+        }, 1000);
+    }
+    titleInput.addEventListener('input', triggerAutoSave);
+
+    // --- 6. Soft Delete Logic WITH CONFIRMATION ---
+    async function softDeleteNote(id) {
+        if (!confirm("Are you sure you want to move this page to the trash?")) return;
+
+        await fetch(`/api/notes/${id}`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
+        });
+        await refreshSidebar();
+    }
+
+    // --- 7. Trash Logic ---
+    async function openTrashModal() {
+        trashModal.show();
+        const listContainer = document.getElementById('trashList');
+        listContainer.innerHTML = '<div class="text-center my-3"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
+
+        try {
+            const res = await fetch(`/api/workspaces/${WS_ID}/trash`);
+            const notes = await res.json();
+
+            if (notes.length === 0) {
+                listContainer.innerHTML = '<p class="text-muted text-center my-3">Trash is empty.</p>';
+                return;
+            }
+
+            listContainer.innerHTML = notes.map(n => `
+                <div class="trash-item">
+                    <span class="fw-bold text-dark">${escapeHtml(n.title || 'Untitled')}</span>
+                    <div class="trash-actions d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-primary" onclick="restoreNote(${n.id})">
+                            <i class="bi bi-arrow-counterclockwise"></i> Restore
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="hardDeleteNote(${n.id})">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) { listContainer.innerHTML = '<p class="text-danger text-center">Failed to load trash.</p>'; }
+    }
+
+    async function restoreNote(id) {
+        await fetch(`/api/notes/${id}/restore`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' } });
+        openTrashModal(); refreshSidebar();
+    }
+
+    async function hardDeleteNote(id) {
+        if (!confirm("Delete forever?")) return;
+        await fetch(`/api/notes/${id}/permanent`, { method: 'DELETE', headers: { 'X-CSRFToken': '{{ csrf_token() }}' } });
+        openTrashModal();
+    }
+
+    refreshSidebar();
+</script>
 {% endblock %}
