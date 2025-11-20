@@ -2,8 +2,10 @@
 {% block title %}Tasks • Nobu{% endblock %}
 
 {% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
 <style>
-    /* ... (Keep all existing CSS exactly the same) ... */
+    /* ... (Keep existing layout/task styles) ... */
     .main-content-wrapper {
         max-width: 1200px;
         margin: 0 auto;
@@ -20,7 +22,7 @@
         align-items: flex-start;
         gap: .75rem;
         transition: all 0.2s ease;
-        cursor: pointer;
+        cursor: grab;
     }
 
     .task-row:hover {
@@ -73,6 +75,7 @@
         letter-spacing: 0.5px;
     }
 
+    /* Sidebar Stats */
     .stat-row {
         display: flex;
         justify-content: space-between;
@@ -144,6 +147,22 @@
         transform: translateY(-2px);
         border-color: #0d6efd;
     }
+
+    /* NEW: Clock Styles */
+    #liveClock {
+        font-variant-numeric: tabular-nums;
+        /* Prevents jittering */
+        letter-spacing: -1px;
+        color: #212529;
+    }
+
+    #liveDate {
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
 </style>
 {% endblock %}
 
@@ -154,10 +173,30 @@
         <div class="col-12 col-xl-9">
             <div class="card shadow-sm border-0">
                 <div class="card-body p-4">
+
+                    <!-- STATE 1: Default Header -->
                     <div id="defaultHeader"
                         class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom transition-fade">
                         <h1 class="h4 mb-0 fw-bold text-dark">Tasks</h1>
-                        <div class="d-flex align-items-center gap-3">
+
+                        <div class="d-flex align-items-center gap-2">
+                            <!-- Sort Dropdown -->
+                            <div class="dropdown">
+                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
+                                    data-bs-toggle="dropdown">
+                                    <i class="bi bi-sort-down"></i> <span id="sortLabel">Manual</span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="#" data-sort="manual">Manual (Drag)</a></li>
+                                    <li><a class="dropdown-item" href="#" data-sort="due_asc">Due Date (Soonest)</a>
+                                    </li>
+                                    <li><a class="dropdown-item" href="#" data-sort="newest">Date Created (Newest)</a>
+                                    </li>
+                                    <li><a class="dropdown-item" href="#" data-sort="alpha">Alphabetical (A-Z)</a></li>
+                                </ul>
+                            </div>
+
+                            <!-- Filter Dropdown -->
                             <div class="dropdown">
                                 <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
                                     data-bs-toggle="dropdown">
@@ -173,23 +212,30 @@
                                     <li><a class="dropdown-item" href="#" data-filter="done">Done</a></li>
                                 </ul>
                             </div>
-                            <button id="newTaskBtn" class="btn btn-sm btn-primary px-3"><i
-                                    class="bi bi-plus-lg me-1"></i>New Task</button>
+
+                            <button id="newTaskBtn" class="btn btn-sm btn-primary px-3">
+                                <i class="bi bi-plus-lg me-1"></i>New Task
+                            </button>
                         </div>
                     </div>
+
+                    <!-- STATE 2: Selection Header -->
                     <div id="selectionHeader"
                         class="d-none align-items-center justify-content-between pb-2 pt-2 px-3 mb-4 border rounded bg-primary-subtle text-primary-emphasis transition-fade">
                         <div class="d-flex align-items-center gap-3">
                             <button id="clearSelectionBtn"
-                                class="btn btn-sm btn-link text-decoration-none text-dark p-0"><i
-                                    class="bi bi-x-lg"></i></button>
+                                class="btn btn-sm btn-link text-decoration-none text-dark p-0">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
                             <span class="fw-bold"><span id="selectedCount">0</span> selected</span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <button id="bulkDeleteBtn" class="btn btn-sm btn-danger"><i class="bi bi-trash3 me-1"></i>
-                                Move to Bin</button>
+                            <button id="bulkDeleteBtn" class="btn btn-sm btn-danger">
+                                <i class="bi bi-trash3 me-1"></i> Move to Bin
+                            </button>
                         </div>
                     </div>
+
                     <div id="taskList"></div>
                 </div>
             </div>
@@ -197,6 +243,16 @@
 
         <!-- Right Column -->
         <div class="col-12 col-xl-3">
+
+            <!-- NEW: Live Clock Card -->
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body text-center py-3">
+                    <h2 id="liveClock" class="display-5 fw-bold mb-0">00:00:00</h2>
+                    <div id="liveDate">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
             <div class="row g-2 mb-3">
                 <div class="col-6">
                     <div class="card shadow-sm border-0 h-100 shortcut-card" onclick="openFocusModal()">
@@ -215,6 +271,8 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Overview Stats -->
             <div class="card shadow-sm border-0 mb-3">
                 <div class="card-body py-3">
                     <h2 class="h6 fw-bold text-secondary mb-3">Overview</h2>
@@ -224,10 +282,14 @@
                             id="stat-overdue">0</span></div>
                     <div class="stat-row"><span>Completed</span><span class="stat-count text-completed"
                             id="stat-completed">0</span></div>
-                    <div class="mt-2 pt-2 border-top text-center"><small class="text-muted"
-                            style="font-size: 0.8rem;">Pending Total: <strong id="stat-total">0</strong></small></div>
+                    <div class="mt-2 pt-2 text-center">
+                        <small class="text-muted" style="font-size: 0.8rem;">Pending Total: <strong
+                                id="stat-total">0</strong></small>
+                    </div>
                 </div>
             </div>
+
+            <!-- Recent Notes -->
             <div class="card shadow-sm border-0">
                 <div class="card-body py-3">
                     <h2 class="h6 fw-bold text-secondary mb-3">Recent Notes</h2>
@@ -240,7 +302,7 @@
     </div>
 </div>
 
-<!-- Existing Modals (Task, Delete) -->
+<!-- Modals (Keep Existing) -->
 <div class="modal fade" id="taskModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -289,20 +351,15 @@
         </div>
     </div>
 </div>
-
-<!-- UPDATED: Focus Timer Modal with Pause Button -->
 <div class="modal fade" id="focusModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-sm modal-dialog-centered">
         <div class="modal-content text-center">
             <div class="modal-body py-4">
                 <h5 class="mb-3">Focus Session</h5>
                 <h1 class="display-4 fw-bold mb-4" id="focusTimerDisplay">25:00</h1>
-                <div class="d-grid gap-2">
-                    <button id="startFocusBtn" class="btn btn-primary">Start</button>
-                    <!-- New Pause Button -->
-                    <button id="pauseFocusBtn" class="btn btn-warning d-none">Pause</button>
-                    <button id="stopFocusBtn" class="btn btn-outline-secondary">Stop / Close</button>
-                </div>
+                <div class="d-grid gap-2"><button id="startFocusBtn" class="btn btn-primary">Start</button><button
+                        id="pauseFocusBtn" class="btn btn-warning d-none">Pause</button><button id="stopFocusBtn"
+                        class="btn btn-outline-secondary">Stop / Close</button></div>
             </div>
         </div>
     </div>
@@ -312,7 +369,34 @@
 {% block scripts_extra %}
 <script src="{{ url_for('static', filename='js/tasks.js') }}"></script>
 <script>
-    // 1. Recent Notes
+    // --- 1. NEW: Live Clock Logic ---
+    function updateClock() {
+        const now = new Date();
+
+        // Time in 24-hour format (e.g., 14:30:05)
+        const timeString = now.toLocaleTimeString('en-GB', {
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        // Date (e.g., Wednesday, 21 November)
+        const dateString = now.toLocaleDateString('en-GB', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long'
+        });
+
+        document.getElementById('liveClock').textContent = timeString;
+        document.getElementById('liveDate').textContent = dateString;
+    }
+    // Start immediately and tick every second
+    updateClock();
+    setInterval(updateClock, 1000);
+
+
+    // --- Existing Side Bar Scripts ---
     async function loadRecentNotes() {
         const container = document.getElementById('recentNotesList');
         try {
@@ -328,7 +412,6 @@
         } catch (err) { console.error(err); container.innerHTML = '<p class="text-danger small">Error loading.</p>'; }
     }
 
-    // 2. Daily Note
     async function openDailyNote() {
         try {
             const res = await fetch('/api/notes/daily', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' } });
@@ -337,12 +420,11 @@
         } catch (err) { console.error(err); }
     }
 
-    // 3. Focus Timer Logic (Start, Pause, Resume, Stop)
+    // Focus Timer Logic
     let countdown;
-    let timeLeft = 25 * 60; // Total seconds
+    let timeLeft = 25 * 60;
     let isRunning = false;
     let isPaused = false;
-
     const focusModal = new bootstrap.Modal(document.getElementById('focusModal'));
     const display = document.getElementById('focusTimerDisplay');
     const startBtn = document.getElementById('startFocusBtn');
@@ -353,76 +435,37 @@
         const seconds = timeLeft % 60;
         display.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     }
-
     function resetTimer() {
         clearInterval(countdown);
         timeLeft = 25 * 60;
         isRunning = false;
         isPaused = false;
         updateDisplay();
-
-        // Reset UI buttons
         startBtn.classList.remove('d-none');
         pauseBtn.classList.add('d-none');
         pauseBtn.textContent = "Pause";
     }
-
-    function openFocusModal() {
-        resetTimer();
-        focusModal.show();
-    }
-
+    function openFocusModal() { resetTimer(); focusModal.show(); }
     function tick() {
         if (timeLeft <= 0) {
-            clearInterval(countdown);
-            isRunning = false;
-            display.textContent = "Done!";
+            clearInterval(countdown); isRunning = false; display.textContent = "Done!";
             new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play().catch(e => { });
-            startBtn.classList.remove('d-none');
-            pauseBtn.classList.add('d-none');
-            return;
+            startBtn.classList.remove('d-none'); pauseBtn.classList.add('d-none'); return;
         }
-        timeLeft--;
-        updateDisplay();
+        timeLeft--; updateDisplay();
     }
-
-    // Start Button
     startBtn.addEventListener('click', () => {
-        isRunning = true;
-        isPaused = false;
-
-        startBtn.classList.add('d-none');
-        pauseBtn.classList.remove('d-none');
-        pauseBtn.textContent = "Pause";
-
+        isRunning = true; isPaused = false;
+        startBtn.classList.add('d-none'); pauseBtn.classList.remove('d-none'); pauseBtn.textContent = "Pause";
         countdown = setInterval(tick, 1000);
     });
-
-    // Pause/Resume Button
     pauseBtn.addEventListener('click', () => {
-        if (isPaused) {
-            // RESUME
-            isPaused = false;
-            pauseBtn.textContent = "Pause";
-            countdown = setInterval(tick, 1000);
-        } else {
-            // PAUSE
-            clearInterval(countdown);
-            isPaused = true;
-            pauseBtn.textContent = "Resume";
-        }
+        if (isPaused) { isPaused = false; pauseBtn.textContent = "Pause"; countdown = setInterval(tick, 1000); }
+        else { clearInterval(countdown); isPaused = true; pauseBtn.textContent = "Resume"; }
     });
-
-    // Stop/Close Button
     document.getElementById('stopFocusBtn').addEventListener('click', () => {
-        // If timer is running or paused (not finished or idle), ask confirmation
-        if (isRunning) {
-            if (!confirm("Focus session is active. Stop and close?")) {
-                return;
-            }
-        }
-        resetTimer();
-        focusModal.hide();
+        if (isRunning) { if (!confirm("Focus session is active. Stop and close?")) return; }
+        resetTimer(); focusModal.hide();
     });
 
     loadRecentNotes();

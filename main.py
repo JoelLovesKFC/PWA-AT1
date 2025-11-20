@@ -66,6 +66,7 @@ class Task(db.Model):
     due_date = db.Column(db.Date)
     status = db.Column(db.String(20), nullable=False, default="todo")
     completed = db.Column(db.Boolean, default=False, nullable=False)
+    position = db.Column(db.Integer, default=0) 
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
@@ -89,34 +90,6 @@ def login_required_page(f):
 
 
 # ----------------- PAGES -----------------
-
-# HOME PAGE (Redirects to Tasks if already logged in)
-@app.route('/')
-def home():
-    if 'user_id' in session:
-        return redirect(url_for('tasks_page'))
-    return render_template("home.html")
-
-@app.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")
-def login():
-    if request.method == 'GET':
-        if 'user_id' in session: return redirect(url_for('tasks_page'))
-        return render_template("login.html")
-
-    data = request.get_json()
-    login_identifier = data.get('login_identifier')
-    password = data.get('password')
-    if not login_identifier or not password:
-        return jsonify({'status': 'error', 'message': 'Username/Email and password are required.'}), 400
-    user = User.query.filter(or_(User.username == login_identifier, User.email == login_identifier)).first()
-    if user and bcrypt.check_password_hash(user.password_hash, password):
-        session['user_id'] = user.id
-        return jsonify({'status': 'success', 'message': 'Login successful!'}), 200
-    else:
-        return jsonify({'status': 'error', 'message': 'Invalid credentials.'}), 401
-
-# TASKS PAGE (Main App Page)
 @app.route("/tasks")
 @login_required_page
 def tasks_page():
@@ -128,6 +101,10 @@ def tasks_page():
 def task_page_alias():
     return redirect(url_for("tasks_page"))
 
+@app.route('/')
+def home():
+    return render_template("home.html")
+
 @app.route('/register', methods=['GET'])
 def register_page():
     return render_template("register.html")
@@ -138,6 +115,12 @@ def workspace_detail(ws_id):
     ws = Workspace.query.get_or_404(ws_id)
     if ws.user_id != session["user_id"]: return "Forbidden", 403
     return render_template("workspace.html", ws=ws)
+
+@app.route("/dashboard")
+@login_required_page
+def dashboard():
+    user = User.query.get(session['user_id'])
+    return render_template("dashboard.html", user=user)
 
 @app.route("/profile")
 @login_required_page
@@ -157,10 +140,32 @@ def change_password_page():
     user = User.query.get(session["user_id"])
     return render_template("change_password.html", user=user)
 
+@app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+def login():
+    if request.method == 'GET':
+        return render_template("login.html")
+
+    data = request.get_json()
+    login_identifier = data.get('login_identifier')
+    password = data.get('password')
+
+    if not login_identifier or not password:
+        return jsonify({'status': 'error', 'message': 'Username/Email and password are required.'}), 400
+
+    user = User.query.filter(or_(User.username == login_identifier, User.email == login_identifier)).first()
+
+    if user and bcrypt.check_password_hash(user.password_hash, password):
+        session['user_id'] = user.id
+        return jsonify({'status': 'success', 'message': 'Login successful!'}), 200
+    else:
+        return jsonify({'status': 'error', 'message': 'Invalid credentials.'}), 401
+
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
 
 # ----------------- AUTH API -----------------
 @app.route('/api/register', methods=['POST'])
@@ -171,11 +176,18 @@ def register():
     email = data.get('email')
     password = data.get('password')
     confirm_password = data.get('confirm_password')
-    if not all([name, username, email, password, confirm_password]): return jsonify({'status': 'error', 'message': 'All fields are required.'}), 400
-    if len(password) < 5: return jsonify({'status': 'error', 'errors': {'password': 'Password must be at least 5 characters.'}}), 400
-    if password != confirm_password: return jsonify({'status': 'error', 'message': 'Passwords do not match.'}), 400
-    if User.query.filter_by(username=username).first(): return jsonify({'status': 'error', 'message': 'Username already exists.'}), 400
-    if User.query.filter_by(email=email).first(): return jsonify({'status': 'error', 'message': 'Email already registered.'}), 400
+
+    if not all([name, username, email, password, confirm_password]):
+        return jsonify({'status': 'error', 'message': 'All fields are required.'}), 400
+    if len(password) < 5:
+        return jsonify({'status': 'error', 'errors': {'password': 'Password must be at least 5 characters.'}}), 400
+    if password != confirm_password:
+        return jsonify({'status': 'error', 'message': 'Passwords do not match.'}), 400
+    if User.query.filter_by(username=username).first():
+        return jsonify({'status': 'error', 'message': 'Username already exists.'}), 400
+    if User.query.filter_by(email=email).first():
+        return jsonify({'status': 'error', 'message': 'Email already registered.'}), 400
+
     hashed = bcrypt.generate_password_hash(password).decode('utf-8')
     new_user = User(name=name, username=username, email=email, password_hash=hashed)
     db.session.add(new_user)
@@ -183,6 +195,8 @@ def register():
     return jsonify({'status': 'success', 'message': 'Registration successful!'}), 201
 
 # ----------------- TASK API -----------------
+
+# 1. LIST TASKS (REVERTED TO DEFAULT SORTING)
 @csrf.exempt
 @app.route("/api/tasks", methods=["GET"])
 @login_required_page
@@ -190,10 +204,21 @@ def list_tasks():
     user_id = session["user_id"]
     st = canonical_status(request.args.get("status"))
     q = Task.query.filter_by(user_id=user_id)
-    if st in STATUS_CHOICES: q = q.filter(Task.status == st)
-    tasks = q.order_by(Task.created_at.desc()).all()
+    
+    if st in STATUS_CHOICES:
+        q = q.filter(Task.status == st)
+        
+    # Sort by Position (ASC), then Created Date (DESC) for manual ordering
+    tasks = q.order_by(Task.position.asc(), Task.created_at.desc()).all()
+
     def to_dict(t):
-        return { "id": t.id, "title": t.title, "description": t.description or "", "due_date": t.due_date.isoformat() if t.due_date else None, "status": t.status, "completed": bool(t.completed), "created_at": t.created_at.isoformat() }
+        return {
+            "id": t.id, "title": t.title, "description": t.description or "",
+            "due_date": t.due_date.isoformat() if t.due_date else None,
+            "status": t.status, "completed": bool(t.completed),
+            "created_at": t.created_at.isoformat(),
+            "position": t.position
+        }
     return jsonify([to_dict(t) for t in tasks]), 200
 
 @csrf.exempt
@@ -203,13 +228,26 @@ def create_task():
     data = request.get_json() or {}
     title = (data.get("title") or "").strip()
     status = canonical_status(data.get("status")) or "todo"
-    if not title: return jsonify({"status": "error", "message": "Title is required."}), 400
+
+    if not title:
+        return jsonify({"status": "error", "message": "Title is required."}), 400
+
     dd = (data.get("due_date") or "").strip()
     due_date = None
     if dd:
         try: due_date = datetime.strptime(dd, "%Y-%m-%d").date()
         except ValueError: return jsonify({"status": "error", "message": "Invalid date format."}), 400
-    task = Task(title=title, description=(data.get("description") or "").strip(), due_date=due_date, status=status, completed=(status == "done"), user_id=session["user_id"])
+    
+    description_val = (data.get("description") or "").strip()
+
+    task = Task(
+        title=title, 
+        description=description_val, 
+        due_date=due_date, 
+        status=status, 
+        completed=(status == "done"), 
+        user_id=session["user_id"]
+    )
     db.session.add(task)
     db.session.commit()
     return jsonify({"id": task.id}), 201
@@ -221,6 +259,7 @@ def update_task(task_id):
     task = Task.query.get_or_404(task_id)
     if task.user_id != session["user_id"]: return jsonify({"status": "error"}), 403
     data = request.get_json() or {}
+
     if "title" in data: task.title = (data.get("title") or "").strip()
     if "description" in data: task.description = (data.get("description") or "").strip()
     if "due_date" in data:
@@ -257,6 +296,23 @@ def bulk_delete_tasks():
     db.session.commit()
     return jsonify({"status": "success"}), 200
 
+@csrf.exempt
+@app.route("/api/tasks/reorder", methods=["POST"])
+@login_required_page
+def reorder_tasks():
+    data = request.get_json() or {}
+    ordered_ids = data.get("ids") or []
+    if not ordered_ids: return jsonify({"status": "success"}), 200
+    tasks = Task.query.filter(Task.user_id == session["user_id"], Task.id.in_(ordered_ids)).all()
+    task_map = {t.id: t for t in tasks}
+    for index, t_id in enumerate(ordered_ids):
+        try: t_id = int(t_id)
+        except: continue
+        if t_id in task_map: task_map[t_id].position = index
+    db.session.commit()
+    return jsonify({"status": "success"}), 200
+
+
 # --- Profile & Password ---
 @csrf.exempt
 @app.route("/api/profile/basic", methods=["POST"])
@@ -264,8 +320,11 @@ def bulk_delete_tasks():
 def api_update_profile_basic():
     data = request.get_json() or {}
     user = User.query.get(session["user_id"])
-    if User.query.filter(User.username == data.get("username"), User.id != user.id).first(): return jsonify({"status": "error", "field": "username", "message": "Username taken"}), 400
-    user.name = data.get("name"); user.username = data.get("username"); user.email = data.get("email")
+    if User.query.filter(User.username == data.get("username"), User.id != user.id).first():
+        return jsonify({"status": "error", "field": "username", "message": "Username taken"}), 400
+    user.name = data.get("name")
+    user.username = data.get("username")
+    user.email = data.get("email")
     db.session.commit()
     return jsonify({"status": "success"}), 200
 
@@ -275,11 +334,14 @@ def api_update_profile_basic():
 def api_change_password():
     data = request.get_json()
     user = User.query.get(session["user_id"])
-    if not bcrypt.check_password_hash(user.password_hash, data.get("current_password")): return jsonify({"status": "error", "message": "Incorrect password"}), 400
+    if not bcrypt.check_password_hash(user.password_hash, data.get("current_password")):
+        return jsonify({"status": "error", "message": "Incorrect password"}), 400
     user.password_hash = bcrypt.generate_password_hash(data.get("new_password")).decode("utf-8")
     db.session.commit()
     return jsonify({"status": "success"}), 200
 
+
+# --- Workspaces ---
 @app.route("/api/workspaces", methods=["GET"])
 @login_required_page
 def list_workspaces():
@@ -302,22 +364,33 @@ def create_workspace():
 def workspace_ops(ws_id):
     ws = Workspace.query.get_or_404(ws_id)
     if ws.user_id != session["user_id"]: return jsonify({"status": "error"}), 403
-    if request.method == 'DELETE': db.session.delete(ws)
-    else: ws.name = request.get_json().get("name")
+    if request.method == 'DELETE':
+        db.session.delete(ws)
+    else:
+        ws.name = request.get_json().get("name")
     db.session.commit()
     return jsonify({"status": "success"}), 200
+
+
+# ----------------- NOTES API -----------------
 
 @csrf.exempt
 @app.route("/api/workspaces/<int:ws_id>/notes", methods=["GET", "POST"])
 @login_required_page
 def ws_notes(ws_id):
-    if not Workspace.query.filter_by(id=ws_id, user_id=session["user_id"]).first(): return jsonify({"status": "error", "message": "Forbidden"}), 403
+    if not Workspace.query.filter_by(id=ws_id, user_id=session["user_id"]).first():
+        return jsonify({"status": "error", "message": "Forbidden"}), 403
+
     if request.method == 'POST':
         empty_block_json = '{"time":1700000000,"blocks":[{"id":"a1","type":"paragraph","data":{"text":""}}],"version":"2.28.0"}'
         n = Note(title="Untitled", content=empty_block_json, user_id=session["user_id"], workspace_id=ws_id)
-        db.session.add(n); db.session.commit()
+        db.session.add(n)
+        db.session.commit()
         return jsonify(n.to_dict()), 201
-    notes = Note.query.filter_by(user_id=session["user_id"], workspace_id=ws_id, is_trashed=False).order_by(Note.updated_at.desc()).all()
+
+    # GET: Only active (non-trashed) notes
+    notes = Note.query.filter_by(user_id=session["user_id"], workspace_id=ws_id, is_trashed=False)\
+                      .order_by(Note.updated_at.desc()).all()
     return jsonify([n.to_dict() for n in notes]), 200
 
 @app.route("/api/notes/<int:note_id>", methods=["GET"])
@@ -332,22 +405,57 @@ def get_single_note(note_id):
 @login_required_page
 def note_ops(note_id):
     n = Note.query.get_or_404(note_id)
-    if n.user_id != session["user_id"]: return jsonify({"status": "error", "message": "Forbidden"}), 403
+    if n.user_id != session["user_id"]:
+        return jsonify({"status": "error", "message": "Forbidden"}), 403
+
     if request.method == 'DELETE':
-        n.is_trashed = True; db.session.commit()
+        # Soft Delete: Move to trash
+        n.is_trashed = True
+        db.session.commit()
         return jsonify({"status": "success"}), 200
+
+    # PUT (Update content or title)
     data = request.get_json() or {}
     if "title" in data: n.title = data["title"]
     if "content" in data:
         content_val = data["content"]
-        n.content = json.dumps(content_val) if isinstance(content_val, (dict, list)) else content_val
+        if isinstance(content_val, (dict, list)):
+            n.content = json.dumps(content_val)
+        else:
+            n.content = content_val
     db.session.commit()
     return jsonify({"status": "success"}), 200
+
+# ----------------- RECENT & DAILY API -----------------
+
+@app.route("/api/notes/recent", methods=["GET"])
+@login_required_page
+def get_recent_notes():
+    notes = Note.query.filter_by(user_id=session["user_id"], is_trashed=False)\
+                      .order_by(Note.updated_at.desc()).limit(5).all()
+    return jsonify([{ "id": n.id, "title": n.title, "workspace_id": n.workspace_id, "updated_at": n.updated_at.isoformat() } for n in notes]), 200
+
+@csrf.exempt
+@app.route("/api/notes/daily", methods=["POST"])
+@login_required_page
+def open_daily_note():
+    user_id = session["user_id"]
+    today_title = f"Daily Note: {datetime.now().strftime('%Y-%m-%d')}"
+    note = Note.query.filter_by(user_id=user_id, title=today_title, is_trashed=False).first()
+    if note: return jsonify({"id": note.id, "workspace_id": note.workspace_id}), 200
+    ws = Workspace.query.filter_by(user_id=user_id).order_by(Workspace.created_at.desc()).first()
+    if not ws: return jsonify({"status": "error", "message": "Please create a workspace first."}), 400
+    new_note = Note(title=today_title, content='{"time":1700000000,"blocks":[{"id":"header","type":"header","data":{"text":"Today\'s Focus","level":2}}],"version":"2.28.0"}', user_id=user_id, workspace_id=ws.id)
+    db.session.add(new_note); db.session.commit()
+    return jsonify({"id": new_note.id, "workspace_id": ws.id}), 201
+
+# ----------------- TRASH API -----------------
 
 @app.route("/api/workspaces/<int:ws_id>/trash", methods=["GET"])
 @login_required_page
 def get_trash(ws_id):
-    notes = Note.query.filter_by(user_id=session["user_id"], workspace_id=ws_id, is_trashed=True).order_by(Note.updated_at.desc()).all()
+    notes = Note.query.filter_by(user_id=session["user_id"], workspace_id=ws_id, is_trashed=True)\
+                      .order_by(Note.updated_at.desc()).all()
     return jsonify([n.to_dict() for n in notes]), 200
 
 @csrf.exempt
@@ -356,7 +464,8 @@ def get_trash(ws_id):
 def restore_note(note_id):
     n = Note.query.get_or_404(note_id)
     if n.user_id != session["user_id"]: return jsonify({"status": "error"}), 403
-    n.is_trashed = False; db.session.commit()
+    n.is_trashed = False
+    db.session.commit()
     return jsonify({"status": "success"}), 200
 
 @csrf.exempt
@@ -365,59 +474,33 @@ def restore_note(note_id):
 def hard_delete_note(note_id):
     n = Note.query.get_or_404(note_id)
     if n.user_id != session["user_id"]: return jsonify({"status": "error"}), 403
-    db.session.delete(n); db.session.commit()
+    db.session.delete(n)
+    db.session.commit()
     return jsonify({"status": "success"}), 200
 
 
-
-@app.route("/api/notes/recent", methods=["GET"])
-@login_required_page
-def get_recent_notes():
-    # Fetch top 5 most recently updated notes
-    notes = Note.query.filter_by(user_id=session["user_id"], is_trashed=False)\
-                      .order_by(Note.updated_at.desc())\
-                      .limit(5).all()
-    
-    # Return minimal data needed for the list
-    return jsonify([{
-        "id": n.id,
-        "title": n.title,
-        "workspace_id": n.workspace_id,
-        "updated_at": n.updated_at.isoformat()
-    } for n in notes]), 200
-
-@csrf.exempt
-@app.route("/api/notes/daily", methods=["POST"])
-@login_required_page
-def open_daily_note():
-    user_id = session["user_id"]
-    today_title = f"Daily Note: {datetime.now().strftime('%Y-%m-%d')}"
-    
-    # 1. Check if it already exists
-    note = Note.query.filter_by(user_id=user_id, title=today_title, is_trashed=False).first()
-    if note:
-        return jsonify({"id": note.id, "workspace_id": note.workspace_id}), 200
-    
-    # 2. If not, find a workspace to put it in (preferably the most recently used or created)
-    ws = Workspace.query.filter_by(user_id=user_id).order_by(Workspace.created_at.desc()).first()
-    
-    if not ws:
-        return jsonify({"status": "error", "message": "Please create a workspace first."}), 400
-        
-    # 3. Create the note
-    new_note = Note(
-        title=today_title,
-        content='{"time":1700000000,"blocks":[{"id":"header","type":"header","data":{"text":"Today\'s Focus","level":2}}],"version":"2.28.0"}',
-        user_id=user_id,
-        workspace_id=ws.id
-    )
-    db.session.add(new_note)
-    db.session.commit()
-    
-    return jsonify({"id": new_note.id, "workspace_id": ws.id}), 201
-
+# --- DB MIGRATION CHECK ---
 with app.app_context():
     db.create_all()
+    try:
+        with db.engine.connect() as conn:
+            # Check for 'is_trashed' in Notes
+            result = conn.execute(text("PRAGMA table_info(note)"))
+            cols_note = [row[1] for row in result.fetchall()]
+            if "is_trashed" not in cols_note:
+                print("Migrating DB: Adding is_trashed column to Note table...")
+                conn.execute(text("ALTER TABLE note ADD COLUMN is_trashed BOOLEAN DEFAULT 0 NOT NULL"))
+            
+            # Check for 'position' in Task
+            result = conn.execute(text("PRAGMA table_info(task)"))
+            cols_task = [row[1] for row in result.fetchall()]
+            if "position" not in cols_task:
+                print("Migrating DB: Adding position column to Task table...")
+                conn.execute(text("ALTER TABLE task ADD COLUMN position INTEGER DEFAULT 0"))
+            
+            conn.commit()
+    except Exception as e:
+        print(f"Migration check failed (ignored): {e}")
 
 if __name__ == '__main__':
     app.run(debug=True)
