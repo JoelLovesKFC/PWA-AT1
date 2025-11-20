@@ -15,7 +15,6 @@
     .app-container {
         display: flex;
         height: calc(100vh - 54px);
-        /* Minus navbar */
         overflow: hidden;
     }
 
@@ -37,15 +36,80 @@
         overflow-y: auto;
         padding-bottom: 100px;
         position: relative;
+        cursor: text;
     }
 
+    /* Editor Container */
     .editor-container {
-        max-width: 850px;
-        margin: 0 auto;
-        padding: 4rem 3rem;
+        max-width: 900px;
+        margin-left: 48px;
+        padding-top: 3rem;
+        padding-bottom: 4rem;
     }
 
-    /* --- Sidebar List Items --- */
+    /* --- Title Input --- */
+    #docTitleInput {
+        width: 100%;
+        border: none;
+        outline: none;
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #222;
+        margin-bottom: 0;
+        padding-bottom: 10px;
+        background: transparent;
+        font-family: 'Inter', sans-serif;
+        text-align: left;
+        padding-left: 0;
+    }
+
+    #docTitleInput::placeholder {
+        color: #e0e0e0;
+    }
+
+    /* --- Visual Separator Line --- */
+    .separator-line {
+        height: 1px;
+        background-color: #ebebeb;
+        margin-bottom: 15px;
+        width: 100%;
+    }
+
+    /* --- Editor Area --- */
+    #editorjs {
+        min-height: 60vh;
+        font-family: 'Inter', sans-serif;
+        font-size: 1rem;
+        line-height: 1.6;
+        color: #2c2c2c;
+        /* Dark text for contrast */
+    }
+
+    /* FORCE Placeholder Visibility */
+    .ce-paragraph[data-placeholder]:empty::before {
+        content: attr(data-placeholder);
+        color: #9ca3af !important;
+        /* Visible Grey */
+        opacity: 1 !important;
+        font-style: normal;
+    }
+
+    /* Align Editor Left */
+    .codex-editor {
+        padding-top: 0 !important;
+    }
+
+    .ce-block__content {
+        max-width: 100%;
+        margin: 0;
+    }
+
+    .ce-toolbar__content {
+        max-width: 100%;
+        margin: 0;
+    }
+
+    /* --- Sidebar Items --- */
     .notes-list-item {
         display: flex;
         align-items: center;
@@ -79,7 +143,6 @@
         padding-top: 2px;
     }
 
-    /* Inline Rename Input */
     .rename-input {
         flex-grow: 1;
         margin-right: 8px;
@@ -97,7 +160,6 @@
         border-color: #bbb;
     }
 
-    /* 3-Dot Button */
     .note-options-btn {
         background: transparent;
         border: none;
@@ -125,7 +187,6 @@
         color: #333;
     }
 
-    /* Dropdown Menu Fixes */
     .dropdown-menu {
         z-index: 9999 !important;
         font-size: 0.85rem;
@@ -160,27 +221,6 @@
     .trash-btn:hover {
         background: #e8e8e6;
         color: #333;
-    }
-
-    /* --- Editor --- */
-    #docTitleInput {
-        width: 100%;
-        border: none;
-        outline: none;
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #222;
-        margin-bottom: 1.5rem;
-        background: transparent;
-        font-family: 'Inter', sans-serif;
-    }
-
-    #docTitleInput::placeholder {
-        color: #ddd;
-    }
-
-    .ce-block__content {
-        max-width: 100%;
     }
 
     #saveStatus {
@@ -220,21 +260,24 @@
                 <i class="bi bi-plus-lg"></i>
             </button>
         </div>
-        <div id="notesListWrapper" style="overflow-y: auto;">
-            <!-- Notes injected here via JS -->
-        </div>
-
+        <div id="notesListWrapper" style="overflow-y: auto;"></div>
         <div class="trash-btn" onclick="openTrashModal()">
             <i class="bi bi-trash3"></i> Trash
         </div>
     </div>
 
-    <!-- Writable Page Area -->
+    <!-- Main Document Area -->
     <div class="document-area" id="documentArea">
         <div id="saveStatus">Saved</div>
 
         <div class="editor-container">
+            <!-- Title -->
             <input type="text" id="docTitleInput" placeholder="Untitled" autocomplete="off">
+
+            <!-- Separator Line -->
+            <div class="separator-line"></div>
+
+            <!-- Editor -->
             <div id="editorjs"></div>
         </div>
     </div>
@@ -246,8 +289,8 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-trash3 me-2"></i>Trash</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title"><i class="bi bi-trash3 me-2"></i>Trash</h5><button type="button"
+                    class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div id="trashList" class="text-muted small text-center">Loading...</div>
@@ -272,36 +315,57 @@
     let currentNoteId = null;
     let saveTimeout;
 
-    // --- 1. Initialize Editor.js ---
+    // --- 1. Initialize Editor.js (UPDATED) ---
     function initEditor(initialData) {
-        if (editor) {
-            try { editor.destroy(); } catch (e) { }
-        }
+        if (editor) { try { editor.destroy(); } catch (e) { } }
+
         let contentData = {};
-        try {
-            contentData = typeof initialData === 'string' ? JSON.parse(initialData) : initialData;
-        } catch (e) { }
+
+        // Parse JSON if string
+        if (typeof initialData === 'string' && initialData.trim().length > 0) {
+            try {
+                contentData = JSON.parse(initialData);
+            } catch (e) { console.log("JSON parse error", e); }
+        } else if (typeof initialData === 'object' && initialData !== null) {
+            contentData = initialData;
+        }
+
+        // FORCE an empty block if data is empty so placeholder shows
+        if (!contentData.blocks || contentData.blocks.length === 0) {
+            contentData = {
+                time: Date.now(),
+                blocks: [
+                    {
+                        type: "paragraph",
+                        data: {
+                            text: "" // Empty text triggers placeholder
+                        }
+                    }
+                ],
+                version: "2.28.0"
+            };
+        }
 
         editor = new EditorJS({
             holder: 'editorjs',
             data: contentData,
-            placeholder: 'Type something...',
+            // Explicit placeholder
+            placeholder: 'Click here to start writing...',
             tools: {
                 header: { class: Header, config: { levels: [2, 3, 4], defaultLevel: 2 } },
                 list: { class: List, inlineToolbar: true },
                 embed: { class: Embed },
                 delimiter: Delimiter,
             },
-            onChange: () => { triggerAutoSave(); }
+            onChange: () => { triggerAutoSave(); },
+            autofocus: false,
+            minHeight: 50
         });
     }
 
     // --- 2. Load Note Logic ---
     async function loadNote(id) {
-        if (document.querySelector('.rename-input')) {
-            await refreshSidebar();
-        }
-
+        if (document.querySelector('.rename-input')) await refreshSidebar();
         currentNoteId = id;
         document.querySelectorAll('.notes-list-item').forEach(el => el.classList.remove('active'));
         const activeItem = document.querySelector(`.notes-list-item[data-id="${id}"]`);
@@ -316,34 +380,34 @@
         } catch (err) { console.error(err); }
     }
 
-    // --- 3. Sidebar Logic ---
+    // --- 3. Enter Key on Title -> Focus Editor ---
+    titleInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (editor) {
+                editor.caret.setToFirstBlock();
+            }
+        }
+    });
+
+    // --- 4. Click White Space -> Focus Editor ---
+    document.getElementById('documentArea').addEventListener('click', (e) => {
+        if (e.target.id === 'documentArea' || e.target.classList.contains('editor-container')) {
+            if (editor) {
+                editor.caret.setToLastBlock();
+            }
+        }
+    });
+
+    // --- 5. Sidebar Logic ---
     async function refreshSidebar() {
         const res = await fetch(`/api/workspaces/${WS_ID}/notes`);
         const notes = await res.json();
 
         notesListEl.innerHTML = notes.map(n => `
             <div class="notes-list-item ${currentNoteId === n.id ? 'active' : ''}" data-id="${n.id}" id="note-row-${n.id}">
-                <span class="note-title-span" onclick="loadNote(${n.id})">
-                    <i class="bi bi-file-text me-2 text-secondary"></i>${escapeHtml(n.title || 'Untitled')}
-                </span>
-                
-                <div class="dropdown">
-                    <button class="note-options-btn" type="button" 
-                            data-bs-toggle="dropdown" 
-                            data-bs-boundary="viewport" 
-                            data-bs-popper-config='{"strategy":"fixed"}'>
-                        <i class="bi bi-three-dots"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                        <li><button class="dropdown-item small" onclick="enableInlineRename(${n.id}, '${escapeHtml(n.title || 'Untitled')}')">
-                            <i class="bi bi-pencil me-2"></i>Rename
-                        </button></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><button class="dropdown-item small text-danger" onclick="softDeleteNote(${n.id})">
-                            <i class="bi bi-trash me-2"></i>Delete
-                        </button></li>
-                    </ul>
-                </div>
+                <span class="note-title-span" onclick="loadNote(${n.id})"><i class="bi bi-file-text me-2 text-secondary"></i>${escapeHtml(n.title || 'Untitled')}</span>
+                <div class="dropdown"><button class="note-options-btn" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" data-bs-popper-config='{"strategy":"fixed"}'><i class="bi bi-three-dots"></i></button><ul class="dropdown-menu dropdown-menu-end shadow-sm"><li><button class="dropdown-item small" onclick="enableInlineRename(${n.id}, '${escapeHtml(n.title || 'Untitled')}')"><i class="bi bi-pencil me-2"></i>Rename</button></li><li><hr class="dropdown-divider"></li><li><button class="dropdown-item small text-danger" onclick="softDeleteNote(${n.id})"><i class="bi bi-trash me-2"></i>Delete</button></li></ul></div>
             </div>
         `).join('');
 
@@ -360,58 +424,30 @@
         return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     }
 
-    // --- 4. Inline Rename Logic ---
     function enableInlineRename(id, currentTitle) {
         const row = document.getElementById(`note-row-${id}`);
         if (!row) return;
-
         const titleSpan = row.querySelector('.note-title-span');
         const dropdownDiv = row.querySelector('.dropdown');
-
-        titleSpan.style.display = 'none';
-        dropdownDiv.style.display = 'none';
-
+        titleSpan.style.display = 'none'; dropdownDiv.style.display = 'none';
         const input = document.createElement('input');
-        input.type = 'text';
-        input.value = currentTitle === 'Untitled' ? '' : currentTitle;
-        input.className = 'rename-input';
-        input.placeholder = 'Page Name';
-
-        row.insertBefore(input, dropdownDiv);
-        input.focus();
-
+        input.type = 'text'; input.value = currentTitle === 'Untitled' ? '' : currentTitle;
+        input.className = 'rename-input'; input.placeholder = 'Page Name';
+        row.insertBefore(input, dropdownDiv); input.focus();
         const saveRename = async () => {
             const newTitle = input.value.trim() || 'Untitled';
-
             input.remove();
             titleSpan.innerHTML = `<i class="bi bi-file-text me-2 text-secondary"></i>${escapeHtml(newTitle)}`;
-            titleSpan.style.display = '';
-            dropdownDiv.style.display = '';
-
-            await fetch(`/api/notes/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
-                body: JSON.stringify({ title: newTitle })
-            });
-
-            if (currentNoteId === id) {
-                titleInput.value = newTitle;
-            }
+            titleSpan.style.display = ''; dropdownDiv.style.display = '';
+            await fetch(`/api/notes/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' }, body: JSON.stringify({ title: newTitle }) });
+            if (currentNoteId === id) titleInput.value = newTitle;
         };
-
         input.addEventListener('blur', saveRename);
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                input.blur();
-            }
-        });
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
     }
 
-    // --- 5. Standard Logic ---
     document.getElementById('createNoteBtn').addEventListener('click', async () => {
-        const res = await fetch(`/api/workspaces/${WS_ID}/notes`, {
-            method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
-        });
+        const res = await fetch(`/api/workspaces/${WS_ID}/notes`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' } });
         const newNote = await res.json();
         await refreshSidebar();
         loadNote(newNote.id);
@@ -423,11 +459,7 @@
         saveTimeout = setTimeout(async () => {
             if (!currentNoteId || !editor) return;
             const savedData = await editor.save();
-            await fetch(`/api/notes/${currentNoteId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
-                body: JSON.stringify({ title: titleInput.value, content: savedData })
-            });
+            await fetch(`/api/notes/${currentNoteId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' }, body: JSON.stringify({ title: titleInput.value, content: savedData }) });
             statusEl.innerText = 'Saved';
             const titleSpan = document.querySelector(`.notes-list-item[data-id="${currentNoteId}"] .note-title-span`);
             if (titleSpan && titleSpan.style.display !== 'none') {
@@ -437,58 +469,27 @@
     }
     titleInput.addEventListener('input', triggerAutoSave);
 
-    // --- 6. Soft Delete Logic WITH CONFIRMATION ---
     async function softDeleteNote(id) {
         if (!confirm("Are you sure you want to move this page to the trash?")) return;
-
-        await fetch(`/api/notes/${id}`, {
-            method: 'DELETE',
-            headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
-        });
+        await fetch(`/api/notes/${id}`, { method: 'DELETE', headers: { 'X-CSRFToken': '{{ csrf_token() }}' } });
         await refreshSidebar();
     }
 
-    // --- 7. Trash Logic ---
     async function openTrashModal() {
         trashModal.show();
         const listContainer = document.getElementById('trashList');
         listContainer.innerHTML = '<div class="text-center my-3"><div class="spinner-border spinner-border-sm text-secondary"></div></div>';
-
         try {
             const res = await fetch(`/api/workspaces/${WS_ID}/trash`);
             const notes = await res.json();
-
-            if (notes.length === 0) {
-                listContainer.innerHTML = '<p class="text-muted text-center my-3">Trash is empty.</p>';
-                return;
-            }
-
+            if (notes.length === 0) { listContainer.innerHTML = '<p class="text-muted text-center my-3">Trash is empty.</p>'; return; }
             listContainer.innerHTML = notes.map(n => `
-                <div class="trash-item">
-                    <span class="fw-bold text-dark">${escapeHtml(n.title || 'Untitled')}</span>
-                    <div class="trash-actions d-flex gap-2">
-                        <button class="btn btn-sm btn-outline-primary" onclick="restoreNote(${n.id})">
-                            <i class="bi bi-arrow-counterclockwise"></i> Restore
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="hardDeleteNote(${n.id})">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                    </div>
-                </div>
+                <div class="trash-item"><span class="fw-bold text-dark">${escapeHtml(n.title || 'Untitled')}</span><div class="trash-actions d-flex gap-2"><button class="btn btn-sm btn-outline-primary" onclick="restoreNote(${n.id})"><i class="bi bi-arrow-counterclockwise"></i> Restore</button><button class="btn btn-sm btn-outline-danger" onclick="hardDeleteNote(${n.id})"><i class="bi bi-x-lg"></i></button></div></div>
             `).join('');
         } catch (e) { listContainer.innerHTML = '<p class="text-danger text-center">Failed to load trash.</p>'; }
     }
-
-    async function restoreNote(id) {
-        await fetch(`/api/notes/${id}/restore`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' } });
-        openTrashModal(); refreshSidebar();
-    }
-
-    async function hardDeleteNote(id) {
-        if (!confirm("Delete forever?")) return;
-        await fetch(`/api/notes/${id}/permanent`, { method: 'DELETE', headers: { 'X-CSRFToken': '{{ csrf_token() }}' } });
-        openTrashModal();
-    }
+    async function restoreNote(id) { await fetch(`/api/notes/${id}/restore`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' } }); openTrashModal(); refreshSidebar(); }
+    async function hardDeleteNote(id) { if (!confirm("Delete forever?")) return; await fetch(`/api/notes/${id}/permanent`, { method: 'DELETE', headers: { 'X-CSRFToken': '{{ csrf_token() }}' } }); openTrashModal(); }
 
     refreshSidebar();
 </script>

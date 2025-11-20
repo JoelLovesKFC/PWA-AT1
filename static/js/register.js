@@ -53,39 +53,39 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       body: JSON.stringify(data)
     })
-    .then(response => {
-      if (!response.ok) {
-        return response.json().then(errorData => {
-          const error = new Error('Server responded with an error.');
-          error.data = errorData;
-          throw error;
-        });
-      }
-      return response.json();
-    })
-    .then(result => {
-      if (result.status === "success") {
-        submitBtn.innerHTML = 'Success!';
-        submitBtn.classList.remove('btn-primary');
-        submitBtn.classList.add('btn-success');
-        setTimeout(() => { window.location.href = "/login"; }, 1000);
-      }
-    })
-    .catch(error => {
-      console.error("Error:", error);
-
-      if (error.data && error.data.errors) {
-        for (const field in error.data.errors) {
-          const errorDiv = document.getElementById(`${field}-error`);
-          const errorMessage = error.data.errors[field];
-          if (errorDiv) errorDiv.textContent = errorMessage; else alert(errorMessage);
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(errorData => {
+            const error = new Error('Server responded with an error.');
+            error.data = errorData;
+            throw error;
+          });
         }
-      } else {
-        alert("An unknown error occurred. Please try again.");
-      }
+        return response.json();
+      })
+      .then(result => {
+        if (result.status === "success") {
+          submitBtn.innerHTML = 'Success!';
+          submitBtn.classList.remove('btn-primary');
+          submitBtn.classList.add('btn-success');
+          setTimeout(() => { window.location.href = "/login"; }, 1000);
+        }
+      })
+      .catch(error => {
+        console.error("Error:", error);
 
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = originalButtonHTML;
-    });
+        if (error.data && error.data.errors) {
+          for (const field in error.data.errors) {
+            const errorDiv = document.getElementById(`${field}-error`);
+            const errorMessage = error.data.errors[field];
+            if (errorDiv) errorDiv.textContent = errorMessage; else alert(errorMessage);
+          }
+        } else {
+          alert("An unknown error occurred. Please try again.");
+        }
+
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalButtonHTML;
+      });
   });
 });

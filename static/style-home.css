@@ -26,7 +26,7 @@ body {
 
 .navbar {
     padding: 1.2rem 0;
-    
+
 }
 
 .navbar-brand i {
@@ -66,7 +66,7 @@ body {
 }
 
 .hero h1 {
-    margin-bottom: 30px; 
+    margin-bottom: 30px;
 }
 
 .hero p {
@@ -76,5 +76,3 @@ body {
 .cta-form {
     margin-top: 20px;
 }
-
-

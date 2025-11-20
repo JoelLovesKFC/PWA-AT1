@@ -72,30 +72,44 @@ p {
   text-align: left;
 }
 
-a { color: #0d6efd; text-decoration: none; }
-a:hover { text-decoration: underline; }
+a {
+  color: #0d6efd;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
 
 
-.password-wrap { position: relative; }
-.password-wrap input { padding-right: 2.6rem; }
+.password-wrap {
+  position: relative;
+}
 
-.password-wrap .toggle-pass{
+.password-wrap input {
+  padding-right: 2.6rem;
+}
+
+.password-wrap .toggle-pass {
   position: absolute;
   right: .5rem;
   top: 50%;
   transform: translateY(-50%);
   background: transparent;
   border: 0;
-  color: rgba(0,0,0,.55);
+  color: rgba(0, 0, 0, .55);
   padding: .25rem;
   border-radius: .35rem;
   line-height: 1;
   width: 2rem;
   height: 2rem;
 }
-.password-wrap .toggle-pass .bi{ font-size: 1rem; }
-.password-wrap .toggle-pass:focus{
-  outline: none;
-  box-shadow: 0 0 0 .2rem rgba(13,110,253,.25);
+
+.password-wrap .toggle-pass .bi {
+  font-size: 1rem;
 }
 
+.password-wrap .toggle-pass:focus {
+  outline: none;
+  box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .25);
+}

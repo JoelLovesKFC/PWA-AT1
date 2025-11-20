@@ -78,7 +78,8 @@ p {
 }
 
 .password-wrap input {
-  padding-right: 2.6rem; /* room for the eye button */
+  padding-right: 2.6rem;
+  /* room for the eye button */
 }
 
 .password-wrap .toggle-pass {
@@ -88,7 +89,7 @@ p {
   transform: translateY(-50%);
   background: transparent;
   border: 0;
-  color: rgba(0,0,0,.55);
+  color: rgba(0, 0, 0, .55);
   padding: .25rem;
   border-radius: .35rem;
   line-height: 1;
@@ -102,5 +103,5 @@ p {
 
 .password-wrap .toggle-pass:focus {
   outline: none;
-  box-shadow: 0 0 0 .2rem rgba(13,110,253,.25);
+  box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .25);
 }

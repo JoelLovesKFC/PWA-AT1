@@ -5,16 +5,17 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}Nobu{% endblock %}</title>
-  <!-- Global CSRF Token for JS to use -->
   <meta name="csrf-token" content="{{ csrf_token() }}">
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
   <style>
-    /* FIX: Removed 'var()' from definition */
     :root {
-      --sidebar-width: 220px;
+      --sidebar-width: 240px;
     }
 
     body {
@@ -29,17 +30,35 @@
     }
 
     .offcanvas-body {
-      padding: .7rem .6rem .8rem .7rem;
+      padding: 0 0.75rem;
+    }
+
+    .navbar-toggler {
+      padding: 0.25rem;
+      font-size: 0.85rem;
+      border: none;
+      margin-left: 5px;
+    }
+
+    .navbar-toggler:focus {
+      box-shadow: none;
+    }
+
+    .navbar-toggler-icon {
+      width: 1.2em;
+      height: 1.2em;
     }
 
     .sidebar .nav-link {
       color: #cfd8e3;
-      border-radius: .5rem;
-      padding: .5rem .6rem .5rem .7rem;
+      border-radius: .4rem;
+      padding: .4rem .7rem;
       display: flex;
       align-items: center;
-      gap: .5rem;
-      font-size: .85rem;
+      gap: .6rem;
+      font-size: .9rem;
+      margin-bottom: 2px;
+      transition: background 0.15s;
     }
 
     .sidebar .nav-link:hover {
@@ -48,24 +67,64 @@
     }
 
     .sidebar .nav-link.active {
-      background: rgba(255, 255, 255, .06);
+      background: rgba(255, 255, 255, .12);
       color: #fff;
-      border-left: 3px solid #72889b;
-      border-top-left-radius: 0;
-      border-bottom-left-radius: 0;
+      font-weight: 600;
     }
 
-    .sidebar .section-title {
-      color: #9fb0c0;
-      font-size: .68rem;
+    .sidebar-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 .7rem;
+      margin-top: 1.5rem;
+      margin-bottom: .5rem;
+      color: #8d9aa9;
+      font-size: .7rem;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: .08em;
-      margin: 1.5rem 0 .75rem;
+      letter-spacing: .05em;
     }
 
-    .sidebar .submenu .nav-link {
-      padding-left: 1.2rem;
-      font-size: .83rem;
+    .add-ws-btn {
+      background: transparent;
+      border: none;
+      color: inherit;
+      padding: 0;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .add-ws-btn:hover {
+      color: #fff;
+    }
+
+    .ws-actions-btn {
+      color: #8d9aa9;
+      opacity: 0;
+      transition: opacity 0.2s, color 0.2s;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: transparent;
+      border: none;
+    }
+
+    .nav-item:hover .ws-actions-btn,
+    .dropdown.show .ws-actions-btn {
+      opacity: 1;
+    }
+
+    .ws-actions-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    #workspaceList .nav-item {
+      cursor: grab;
+    }
+
+    #workspaceList .nav-item:active {
+      cursor: grabbing;
     }
 
     .navbar {
@@ -74,23 +133,28 @@
       padding-bottom: .35rem;
     }
 
-    .navbar-toggler {
-      padding: .2rem .4rem;
-      font-size: .75rem;
-      border: none;
-      margin-left: .5rem;
-    }
-
-    .navbar-toggler-icon {
-      width: 1.2em;
-      height: 1.2em;
-    }
-
     #logoutBtn {
       padding: .26rem .6rem;
       font-size: .85rem;
       line-height: 1.15;
       border-radius: .4rem;
+    }
+
+    /* Trash Modal Styles */
+    .trash-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .trash-item:last-child {
+      border-bottom: none;
+    }
+
+    .trash-actions button {
+      font-size: 0.75rem;
     }
   </style>
   {% block head_extra %}{% endblock %}
@@ -115,12 +179,11 @@
     </div>
 
     <div class="offcanvas-body sidebar">
-      <div class="section-title">Main</div>
-      <ul class="nav nav-pills flex-column mb-4">
+      <ul class="nav nav-pills flex-column mt-4">
         <li class="nav-item">
           <a class="nav-link {{ 'active' if request.endpoint == 'tasks_page' or request.endpoint == 'task_page_alias' else '' }}"
             href="/tasks">
-            <i class="bi bi-card-checklist"></i> <span>Tasks</span>
+            <i class="bi bi-check2-square"></i> <span>Tasks</span>
           </a>
         </li>
         <li class="nav-item">
@@ -128,27 +191,23 @@
             <i class="bi bi-person"></i> <span>Profile</span>
           </a>
         </li>
+        <!-- NEW TRASH ITEM -->
+        <li class="nav-item">
+          <a class="nav-link" href="#" id="openWsTrashBtn">
+            <i class="bi bi-trash3"></i> <span>Trash</span>
+          </a>
+        </li>
       </ul>
 
-      <div class="section-title">Workspace Actions</div>
-      <div class="mb-4 d-grid">
-        <button class="btn btn-outline-light btn-sm" data-action="open-create-workspace" type="button">
-          <i class="bi bi-plus-lg me-1"></i> Create a Workspace
+      <div class="sidebar-section-header">
+        <span>Workspaces</span>
+        <button class="add-ws-btn" data-action="open-create-workspace" title="Create Workspace">
+          <i class="bi bi-plus-lg"></i>
         </button>
       </div>
 
-      <div class="section-title">Your Workspaces</div>
-      <ul class="nav nav-pills flex-column mb-4">
-        <li class="nav-item">
-          <a class="nav-link d-flex align-items-center" data-bs-toggle="collapse" href="#workspaceMenu" role="button"
-            aria-expanded="true">
-            <i class="bi bi-collection"></i> <span>Workspaces</span> <i class="bi bi-chevron-down ms-auto"></i>
-          </a>
-          <div class="collapse show submenu" id="workspaceMenu">
-            <ul id="workspaceList" class="nav flex-column ms-1 mb-2"></ul>
-          </div>
-        </li>
-      </ul>
+      <ul id="workspaceList" class="nav nav-pills flex-column"></ul>
+
       {% block sidebar_extra %}{% endblock %}
     </div>
   </aside>
@@ -156,6 +215,22 @@
   <main class="container-fluid">
     {% block content %}{% endblock %}
   </main>
+
+  <!-- GLOBAL WORKSPACE TRASH MODAL -->
+  <div class="modal fade" id="workspaceTrashModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-trash3 me-2"></i>Deleted Workspaces</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="wsTrashList" class="text-center text-muted small my-3">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="{{ url_for('static', filename='js/workspaces.js') }}"></script>
   {% block scripts_extra %}{% endblock %}
