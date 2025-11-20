@@ -3,6 +3,7 @@
 
 {% block head_extra %}
 <style>
+    /* --- General Task Styles --- */
     .task-row {
         background: #fff;
         border: 1px solid var(--bs-border-color);
@@ -27,6 +28,7 @@
         border-color: #0d6efd;
     }
 
+    /* Status Colors */
     .task-row.status-todo {
         border-left-color: #6c757d;
     }
@@ -37,17 +39,17 @@
 
     .task-row.status-done {
         border-left-color: #198754;
-        opacity: 0.85;
+        opacity: 1;
     }
 
     .task-title {
         font-weight: 600;
-        color: #212529;
+        color: #000000 !important;
     }
 
     .status-done .task-title {
-        text-decoration: line-through;
-        color: #6c757d;
+        color: #000000 !important;
+        text-decoration: none;
     }
 
     .task-meta {
@@ -66,11 +68,53 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
+
+    /* --- Workspace Sidebar Styles --- */
+    .workspace-link {
+        display: block;
+        padding: 6px 8px;
+        border-radius: 4px;
+        color: #333;
+        text-decoration: none;
+        transition: background 0.2s;
+        font-size: 0.95rem;
+    }
+
+    .workspace-link:hover {
+        background-color: #f3f4f6;
+        color: #000;
+    }
+
+    .ws-item-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .quick-add-page-btn {
+        opacity: 0;
+        transition: opacity 0.2s;
+        color: #888;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: transparent;
+        border: none;
+    }
+
+    .ws-item-container:hover .quick-add-page-btn {
+        opacity: 1;
+    }
+
+    .quick-add-page-btn:hover {
+        background-color: #e9ecef;
+        color: #0d6efd;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="row g-3 mt-3">
+    <!-- Left Column: Tasks -->
     <div class="col-12 col-xl-9">
         <div class="card shadow-sm border-0">
             <div class="card-body p-4">
@@ -78,6 +122,7 @@
                     <h1 class="h4 mb-0 fw-bold text-dark">Tasks</h1>
 
                     <div class="d-flex align-items-center gap-2">
+                        <!-- Filter Dropdown -->
                         <div class="dropdown">
                             <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
                                 data-bs-toggle="dropdown">
@@ -108,22 +153,54 @@
         </div>
     </div>
 
+    <!-- Right Column: Sidebar -->
     <div class="col-12 col-xl-3">
-        <div class="card shadow-sm border-0">
+
+        <!-- Quick Links Card -->
+        <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
                 <h2 class="h6 fw-bold text-secondary mb-3">Quick Links</h2>
                 <div class="d-grid gap-2">
-                    <a href="/dashboard" class="btn btn-light btn-sm text-start"><i
-                            class="bi bi-speedometer2 me-2"></i>Dashboard</a>
                     <a href="/profile" class="btn btn-light btn-sm text-start"><i
                             class="bi bi-person me-2"></i>Profile</a>
                 </div>
             </div>
         </div>
+
+        <!-- Workspaces Card -->
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h6 fw-bold text-secondary mb-0">Workspaces</h2>
+                    <button class="btn btn-sm btn-link text-secondary p-0" data-bs-toggle="modal"
+                        data-bs-target="#createWsModal" title="New Workspace">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                </div>
+
+                <div id="workspaceListContainer">
+                    {% if user.workspaces|length == 0 %}
+                    <p class="text-muted small fst-italic">No workspaces yet.</p>
+                    {% else %}
+                    {% for ws in user.workspaces %}
+                    <div class="ws-item-container mb-1">
+                        <a href="/workspaces/{{ ws.id }}" class="workspace-link text-truncate flex-grow-1">
+                            <i class="bi bi-kanban me-2 text-secondary"></i>{{ ws.name }}
+                        </a>
+                        <button class="quick-add-page-btn" data-workspace-id="{{ ws.id }}" title="Create page inside">
+                            <i class="bi bi-plus"></i>
+                        </button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
-<!-- New/Edit Modal -->
+<!-- Task New/Edit Modal -->
 <div class="modal fade" id="taskModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -166,7 +243,7 @@
     </div>
 </div>
 
-<!-- Delete Confirmation -->
+<!-- Task Delete Confirmation -->
 <div class="modal fade" id="deleteTaskModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -186,8 +263,86 @@
         </div>
     </div>
 </div>
+
+<!-- Create Workspace Modal -->
+<div class="modal fade" id="createWsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Workspace</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createWsForm">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Workspace Name</label>
+                        <input type="text" id="newWsName" class="form-control" placeholder="e.g. Marketing, Personal..."
+                            required>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Create Workspace</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts_extra %}
 <script src="{{ url_for('static', filename='js/tasks.js') }}"></script>
+<script>
+    // Helper function to read the token from the HTML meta tag
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    }
+
+    // Event delegation for workspace quick-add buttons
+    document.addEventListener('click', function (e) {
+        if (e.target.closest('.quick-add-page-btn')) {
+            const btn = e.target.closest('.quick-add-page-btn');
+            const wsId = btn.getAttribute('data-workspace-id');
+            if (wsId) {
+                quickCreatePage(wsId);
+            }
+        }
+    });
+
+    document.getElementById('createWsForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('newWsName').value.trim();
+        if (!name) return;
+
+        try {
+            const res = await fetch('/api/workspaces', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                body: JSON.stringify({ name: name })
+            });
+            if (res.ok) window.location.reload();
+        } catch (err) {
+            console.error(err);
+            alert("Failed to create workspace");
+        }
+    });
+
+    async function quickCreatePage(wsId) {
+        try {
+            const res = await fetch(`/api/workspaces/${wsId}/notes`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken()
+                }
+            });
+
+            if (res.ok) window.location.href = `/workspaces/${wsId}`;
+        } catch (err) {
+            console.error(err);
+            alert("Could not create page.");
+        }
+    }
+</script>
 {% endblock %}

@@ -3,18 +3,15 @@ document.addEventListener("DOMContentLoaded", function () {
   const submitBtn = document.getElementById("submitBtn");
   const originalButtonHTML = submitBtn.innerHTML;
 
-  // ------- Eye / eye-slash toggle for password -------
   const toggleBtn = document.getElementById('toggleLoginPw');
-  const pwInput  = document.getElementById('login_password');
+  const pwInput = document.getElementById('login_password');
 
   if (toggleBtn && pwInput) {
     toggleBtn.addEventListener('click', () => {
       const show = pwInput.type === 'password';
       pwInput.type = show ? 'text' : 'password';
-
       toggleBtn.setAttribute('aria-pressed', String(show));
       toggleBtn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-
       const icon = toggleBtn.querySelector('i');
       if (icon) {
         icon.classList.toggle('bi-eye', !show);
@@ -22,19 +19,14 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
   }
-  // ----------------------------------------------------
 
   loginForm.addEventListener("submit", function (event) {
     event.preventDefault();
-
     const errorDiv = document.getElementById('general-error');
     if (errorDiv) errorDiv.textContent = '';
 
     submitBtn.disabled = true;
-    submitBtn.innerHTML = `
-      <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-      Logging In...
-    `;
+    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Logging In...`;
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     const formData = new FormData(loginForm);
@@ -43,10 +35,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     fetch("/login", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": csrfToken
-      },
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
       body: JSON.stringify(data)
     })
       .then(response => {
@@ -61,7 +50,8 @@ document.addEventListener("DOMContentLoaded", function () {
       })
       .then(result => {
         if (result.status === "success") {
-          window.location.href = "/dashboard";
+          // UPDATED: Redirects to /tasks instead of /dashboard
+          window.location.href = "/tasks";
         }
       })
       .catch(error => {
@@ -83,16 +73,8 @@ window.addEventListener('pageshow', function (event) {
     const loginForm = document.getElementById("loginForm");
     const submitBtn = document.getElementById("submitBtn");
     const errorDiv = document.getElementById('general-error');
-
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = 'Login';
-    }
-    if (loginForm) {
-      loginForm.reset();
-    }
-    if (errorDiv) {
-      errorDiv.textContent = '';
-    }
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = 'Login'; }
+    if (loginForm) loginForm.reset();
+    if (errorDiv) errorDiv.textContent = '';
   }
 });
