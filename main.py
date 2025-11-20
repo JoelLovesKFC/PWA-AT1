@@ -46,7 +46,6 @@ class Note(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False, default="Untitled")
     content = db.Column(db.Text, nullable=True)
-    # NEW: Soft delete flag
     is_trashed = db.Column(db.Boolean, default=False, nullable=False)
     
     date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -156,6 +155,13 @@ def profile():
 def edit_profile_page():
     user = User.query.get_or_404(session["user_id"])
     return render_template("edit_profile.html", user=user)
+
+# --- RESTORED ROUTE ---
+@app.route("/change_password", methods=["GET"])
+@login_required_page
+def change_password_page():
+    user = User.query.get(session["user_id"])
+    return render_template("change_password.html", user=user)
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
@@ -465,7 +471,6 @@ def hard_delete_note(note_id):
 
 
 # --- DB MIGRATION CHECK ---
-# Attempt to add is_trashed column if it doesn't exist (for existing DBs)
 with app.app_context():
     db.create_all()
     try:
