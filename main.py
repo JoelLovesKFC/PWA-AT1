@@ -47,8 +47,16 @@ class Note(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     workspace_id = db.Column(db.Integer, db.ForeignKey('workspace.id'), nullable=True)
+    
     def to_dict(self):
-        return { 'id': self.id, 'title': self.title, 'content': self.content, 'is_trashed': self.is_trashed, 'date_created': self.date_created.isoformat(), 'updated_at': self.updated_at.isoformat() if self.updated_at else None, 'workspace_id': self.workspace_id }
+        return { 
+            'id': self.id, 
+            'title': self.title, 
+            'content': self.content, 
+            'is_trashed': self.is_trashed, 
+            'date_created': self.date_created.isoformat(), 
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
 
 class Workspace(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -68,7 +76,9 @@ class Task(db.Model):
     due_date = db.Column(db.Date)
     status = db.Column(db.String(20), nullable=False, default="todo")
     completed = db.Column(db.Boolean, default=False, nullable=False)
-    position = db.Column(db.Integer, default=0) 
+    position = db.Column(db.Integer, default=0)
+    # UPDATED: Added is_trashed for soft delete
+    is_trashed = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
@@ -110,8 +120,6 @@ def home():
 @app.route('/register', methods=['GET'])
 def register_page():
     return render_template("register.html")
-
-# REMOVED: workspace_detail route
 
 @app.route("/dashboard")
 @login_required_page
@@ -193,7 +201,6 @@ def register():
 
 # ----------------- TASK API -----------------
 
-# 1. LIST TASKS
 @csrf.exempt
 @app.route("/api/tasks", methods=["GET"])
 @login_required_page
@@ -201,7 +208,8 @@ def list_tasks():
     user_id = session["user_id"]
     st = canonical_status(request.args.get("status"))
     
-    q = Task.query.filter_by(user_id=user_id)
+    # UPDATED: Filter by is_trashed=False
+    q = Task.query.filter_by(user_id=user_id, is_trashed=False)
     
     if st in STATUS_CHOICES:
         q = q.filter(Task.status == st)
@@ -277,7 +285,9 @@ def update_task(task_id):
 def delete_task(task_id):
     task = Task.query.get_or_404(task_id)
     if task.user_id != session["user_id"]: return jsonify({"status": "error"}), 403
-    db.session.delete(task)
+    
+    # UPDATED: Soft delete
+    task.is_trashed = True
     db.session.commit()
     return jsonify({"status": "success"}), 200
 
@@ -288,8 +298,9 @@ def bulk_delete_tasks():
     data = request.get_json() or {}
     ids = data.get("ids") or []
     if not ids: return jsonify({"status": "error", "message": "No ids provided."}), 400
-    q = Task.query.filter(Task.user_id == session["user_id"], Task.id.in_(ids))
-    q.delete(synchronize_session=False)
+    
+    # UPDATED: Bulk soft delete
+    Task.query.filter(Task.user_id == session["user_id"], Task.id.in_(ids)).update({Task.is_trashed: True}, synchronize_session=False)
     db.session.commit()
     return jsonify({"status": "success"}), 200
 
@@ -308,6 +319,160 @@ def reorder_tasks():
         if t_id in task_map: task_map[t_id].position = index
     db.session.commit()
     return jsonify({"status": "success"}), 200
+
+
+# ----------------- NOTES API (Standalone) -----------------
+
+@csrf.exempt
+@app.route("/api/standalone_notes", methods=["GET"])
+@login_required_page
+def list_standalone_notes():
+    sort_by = request.args.get("sort", "newest")
+    
+    q = Note.query.filter_by(user_id=session["user_id"], is_trashed=False)
+    
+    if sort_by == "oldest":
+        q = q.order_by(Note.updated_at.asc())
+    elif sort_by == "alpha":
+        q = q.order_by(Note.title.asc())
+    else:
+        q = q.order_by(Note.updated_at.desc())
+        
+    notes = q.all()
+    return jsonify([n.to_dict() for n in notes]), 200
+
+@csrf.exempt
+@app.route("/api/standalone_notes", methods=["POST"])
+@login_required_page
+def create_standalone_note():
+    data = request.get_json() or {}
+    title = (data.get("title") or "Untitled").strip()
+    content = data.get("content") or ""
+    
+    note = Note(title=title, content=content, user_id=session["user_id"])
+    db.session.add(note)
+    db.session.commit()
+    return jsonify(note.to_dict()), 201
+
+@csrf.exempt
+@app.route("/api/standalone_notes/<int:note_id>", methods=["PUT"])
+@login_required_page
+def update_standalone_note(note_id):
+    note = Note.query.get_or_404(note_id)
+    if note.user_id != session["user_id"]: 
+        return jsonify({"status": "error", "message": "Forbidden"}), 403
+    
+    data = request.get_json() or {}
+    if "title" in data:
+        note.title = (data.get("title") or "Untitled").strip()
+    if "content" in data:
+        note.content = data.get("content")
+    
+    db.session.commit()
+    return jsonify(note.to_dict()), 200
+
+@csrf.exempt
+@app.route("/api/standalone_notes/<int:note_id>", methods=["DELETE"])
+@login_required_page
+def delete_standalone_note(note_id):
+    note = Note.query.get_or_404(note_id)
+    if note.user_id != session["user_id"]: 
+        return jsonify({"status": "error", "message": "Forbidden"}), 403
+    
+    # Soft delete
+    note.is_trashed = True
+    db.session.commit()
+    return jsonify({"status": "success"}), 200
+
+
+# ----------------- GLOBAL TRASH API -----------------
+
+@app.route("/api/trash", methods=["GET"])
+@login_required_page
+def get_trash_items():
+    user_id = session["user_id"]
+    
+    # Get trashed Tasks
+    tasks = Task.query.filter_by(user_id=user_id, is_trashed=True).order_by(Task.created_at.desc()).all()
+    # Get trashed Notes
+    notes = Note.query.filter_by(user_id=user_id, is_trashed=True).order_by(Note.updated_at.desc()).all()
+    
+    trash_items = []
+    
+    for t in tasks:
+        trash_items.append({
+            "id": t.id,
+            "type": "task",
+            "title": t.title,
+            "date": t.created_at.isoformat()
+        })
+        
+    for n in notes:
+        trash_items.append({
+            "id": n.id,
+            "type": "note",
+            "title": n.title,
+            "date": n.updated_at.isoformat() if n.updated_at else n.date_created.isoformat()
+        })
+        
+    # Sort combined list by date descending
+    trash_items.sort(key=lambda x: x['date'], reverse=True)
+    
+    return jsonify(trash_items), 200
+
+@csrf.exempt
+@app.route("/api/trash/restore", methods=["POST"])
+@login_required_page
+def restore_item():
+    data = request.get_json() or {}
+    item_id = data.get("id")
+    item_type = data.get("type")
+    
+    if not item_id or not item_type:
+        return jsonify({"status": "error"}), 400
+        
+    if item_type == "task":
+        item = Task.query.get(item_id)
+        if item and item.user_id == session["user_id"]:
+            item.is_trashed = False
+            db.session.commit()
+            return jsonify({"status": "success"}), 200
+            
+    elif item_type == "note":
+        item = Note.query.get(item_id)
+        if item and item.user_id == session["user_id"]:
+            item.is_trashed = False
+            db.session.commit()
+            return jsonify({"status": "success"}), 200
+            
+    return jsonify({"status": "error", "message": "Item not found"}), 404
+
+@csrf.exempt
+@app.route("/api/trash/permanent", methods=["DELETE"])
+@login_required_page
+def permanent_delete_item():
+    data = request.get_json() or {}
+    item_id = data.get("id")
+    item_type = data.get("type")
+    
+    if not item_id or not item_type:
+        return jsonify({"status": "error"}), 400
+        
+    if item_type == "task":
+        item = Task.query.get(item_id)
+        if item and item.user_id == session["user_id"]:
+            db.session.delete(item)
+            db.session.commit()
+            return jsonify({"status": "success"}), 200
+            
+    elif item_type == "note":
+        item = Note.query.get(item_id)
+        if item and item.user_id == session["user_id"]:
+            db.session.delete(item)
+            db.session.commit()
+            return jsonify({"status": "success"}), 200
+            
+    return jsonify({"status": "error", "message": "Item not found"}), 404
 
 
 # --- Profile & Password ---
@@ -337,8 +502,6 @@ def api_change_password():
     db.session.commit()
     return jsonify({"status": "success"}), 200
 
-# REMOVED: Workspaces API and Notes API (since notes depend on workspaces)
-
 # --- DB MIGRATION CHECK ---
 with app.app_context():
     db.create_all()
@@ -353,6 +516,10 @@ with app.app_context():
             cols_task = [row[1] for row in result.fetchall()]
             if "position" not in cols_task:
                 conn.execute(text("ALTER TABLE task ADD COLUMN position INTEGER DEFAULT 0"))
+            # UPDATED: Check for is_trashed in Task
+            if "is_trashed" not in cols_task:
+                print("Migrating DB: Adding is_trashed column to Task table...")
+                conn.execute(text("ALTER TABLE task ADD COLUMN is_trashed BOOLEAN DEFAULT 0 NOT NULL"))
 
             result = conn.execute(text("PRAGMA table_info(workspace)"))
             cols_ws = [row[1] for row in result.fetchall()]
