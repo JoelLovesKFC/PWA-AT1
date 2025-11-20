@@ -368,6 +368,54 @@ def hard_delete_note(note_id):
     db.session.delete(n); db.session.commit()
     return jsonify({"status": "success"}), 200
 
+
+
+@app.route("/api/notes/recent", methods=["GET"])
+@login_required_page
+def get_recent_notes():
+    # Fetch top 5 most recently updated notes
+    notes = Note.query.filter_by(user_id=session["user_id"], is_trashed=False)\
+                      .order_by(Note.updated_at.desc())\
+                      .limit(5).all()
+    
+    # Return minimal data needed for the list
+    return jsonify([{
+        "id": n.id,
+        "title": n.title,
+        "workspace_id": n.workspace_id,
+        "updated_at": n.updated_at.isoformat()
+    } for n in notes]), 200
+
+@csrf.exempt
+@app.route("/api/notes/daily", methods=["POST"])
+@login_required_page
+def open_daily_note():
+    user_id = session["user_id"]
+    today_title = f"Daily Note: {datetime.now().strftime('%Y-%m-%d')}"
+    
+    # 1. Check if it already exists
+    note = Note.query.filter_by(user_id=user_id, title=today_title, is_trashed=False).first()
+    if note:
+        return jsonify({"id": note.id, "workspace_id": note.workspace_id}), 200
+    
+    # 2. If not, find a workspace to put it in (preferably the most recently used or created)
+    ws = Workspace.query.filter_by(user_id=user_id).order_by(Workspace.created_at.desc()).first()
+    
+    if not ws:
+        return jsonify({"status": "error", "message": "Please create a workspace first."}), 400
+        
+    # 3. Create the note
+    new_note = Note(
+        title=today_title,
+        content='{"time":1700000000,"blocks":[{"id":"header","type":"header","data":{"text":"Today\'s Focus","level":2}}],"version":"2.28.0"}',
+        user_id=user_id,
+        workspace_id=ws.id
+    )
+    db.session.add(new_note)
+    db.session.commit()
+    
+    return jsonify({"id": new_note.id, "workspace_id": ws.id}), 201
+
 with app.app_context():
     db.create_all()
 

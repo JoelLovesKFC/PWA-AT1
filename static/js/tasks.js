@@ -1,10 +1,13 @@
 (() => {
     const listEl = document.getElementById('taskList');
+    const defaultHeader = document.getElementById('defaultHeader');
+    const selectionHeader = document.getElementById('selectionHeader');
     const newBtn = document.getElementById('newTaskBtn');
     const delBtn = document.getElementById('bulkDeleteBtn');
+    const clearSelBtn = document.getElementById('clearSelectionBtn');
+    const selectedCountSpan = document.getElementById('selectedCount');
     const filterLabel = document.getElementById('filterLabel');
 
-    // Modal elements
     const modalEl = document.getElementById('taskModal');
     const bsModal = new bootstrap.Modal(modalEl);
     const form = document.getElementById('taskForm');
@@ -14,7 +17,6 @@
     const fldDue = document.getElementById('taskDue');
     const fldStatus = document.getElementById('taskStatus');
 
-    // State
     let currentFilter = 'all';
     let selected = new Set();
     let lastItems = [];
@@ -31,7 +33,6 @@
         const rawStatus = t.status || (t.completed ? 'done' : 'todo');
         const meta = getStatusMeta(rawStatus);
         const due = t.due_date ? `<span class="ms-2 text-muted"><i class="bi bi-calendar-event me-1"></i>${t.due_date}</span>` : '';
-
         const isSelected = selected.has(t.id);
         const checkedAttr = isSelected ? 'checked' : '';
         const selectionClass = isSelected ? 'selected-row' : '';
@@ -56,13 +57,11 @@
       </div>`;
     }
 
-    function escapeHtml(s) {
-        return (s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
-    }
+    function escapeHtml(s) { return (s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
 
     function setFilter(newFilter, labelText) {
         currentFilter = newFilter;
-        filterLabel.textContent = labelText;
+        filterLabel.textContent = "Filter: " + labelText;
         applyFilter();
     }
 
@@ -74,11 +73,32 @@
             row.style.display = show ? 'flex' : 'none';
             if (show) visibleCount++;
         });
+    }
 
-        // Optional: Show empty state if filter matches nothing
-        if (visibleCount === 0 && listEl.children.length > 0) {
-            // You could add an empty state message here if desired
-        }
+    function calculateStats(items) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        let overdueCount = 0, todayCount = 0, completedCount = 0, pendingTotal = 0;
+
+        items.forEach(t => {
+            const isDone = (t.status === 'done' || t.completed);
+            if (isDone) {
+                completedCount++;
+            } else {
+                pendingTotal++;
+                if (t.due_date === todayStr) todayCount++;
+                if (t.due_date && t.due_date < todayStr) overdueCount++;
+            }
+        });
+
+        const elToday = document.getElementById('stat-today');
+        const elOverdue = document.getElementById('stat-overdue');
+        const elCompleted = document.getElementById('stat-completed');
+        const elTotal = document.getElementById('stat-total');
+
+        if (elToday) elToday.textContent = todayCount;
+        if (elOverdue) elOverdue.textContent = overdueCount;
+        if (elCompleted) elCompleted.textContent = completedCount;
+        if (elTotal) elTotal.textContent = pendingTotal;
     }
 
     async function loadTasks() {
@@ -92,24 +112,34 @@
                 listEl.innerHTML = items.map(rowTemplate).join('');
             }
             applyFilter();
-            updateBulkButton();
-        } catch (e) {
-            console.error(e);
-        }
+            selected.clear(); updateBulkUI();
+            calculateStats(items);
+        } catch (e) { console.error(e); }
     }
 
     function toggleSelected(id, state) {
-        if (state) selected.add(id);
-        else selected.delete(id);
-        updateBulkButton();
+        if (state) selected.add(id); else selected.delete(id);
+        updateBulkUI();
     }
 
-    function updateBulkButton() {
-        delBtn.disabled = selected.size === 0;
-        delBtn.innerHTML = `<i class="bi bi-trash"></i> ${selected.size ? `(${selected.size})` : ''}`;
+    function updateBulkUI() {
+        if (selected.size > 0) {
+            defaultHeader.classList.remove('d-flex'); defaultHeader.classList.add('d-none');
+            selectionHeader.classList.remove('d-none'); selectionHeader.classList.add('d-flex');
+            selectedCountSpan.textContent = selected.size;
+        } else {
+            selectionHeader.classList.remove('d-flex'); selectionHeader.classList.add('d-none');
+            defaultHeader.classList.remove('d-none'); defaultHeader.classList.add('d-flex');
+        }
     }
 
-    // --- Row Interaction ---
+    function clearSelection() {
+        selected.clear();
+        document.querySelectorAll('.task-check').forEach(cb => cb.checked = false);
+        document.querySelectorAll('.task-row').forEach(r => r.classList.remove('selected-row'));
+        updateBulkUI();
+    }
+
     listEl.addEventListener('click', (e) => {
         const row = e.target.closest('.task-row');
         if (!row) return;
@@ -128,126 +158,69 @@
             return;
         }
 
-        // Checkbox click
-        if (e.target.classList.contains('task-check')) {
-            e.stopPropagation();
-            const isChecked = e.target.checked;
-            toggleSelected(id, isChecked);
-            if (isChecked) row.classList.add('selected-row');
-            else row.classList.remove('selected-row');
-            return;
-        }
-
-        // Row click (toggle)
         const newState = !checkbox.checked;
-        checkbox.checked = newState;
-        toggleSelected(id, newState);
-        if (newState) row.classList.add('selected-row');
+        if (!e.target.classList.contains('task-check')) checkbox.checked = newState;
+        toggleSelected(id, checkbox.checked);
+        if (checkbox.checked) row.classList.add('selected-row');
         else row.classList.remove('selected-row');
     });
 
-    // --- Modals ---
     function openModalForCreate() {
-        form.reset();
-        fldId.value = '';
-
-        // FIX 1: If current filter is specific (e.g. "done"), default the new task status to "done"
-        if (['todo', 'in_progress', 'done'].includes(currentFilter)) {
-            fldStatus.value = currentFilter;
-        } else {
-            fldStatus.value = 'todo';
-        }
-
+        form.reset(); fldId.value = '';
+        fldStatus.value = ['todo', 'in_progress', 'done'].includes(currentFilter) ? currentFilter : 'todo';
         document.getElementById('taskModalLabel').textContent = 'New Task';
         bsModal.show();
     }
 
     function openModalForEdit(t) {
-        form.reset();
-        fldId.value = t.id;
-        fldTitle.value = t.title || '';
-        fldDesc.value = t.description || '';
-        fldDue.value = t.due_date || '';
-        fldStatus.value = t.status || 'todo';
+        form.reset(); fldId.value = t.id; fldTitle.value = t.title || ''; fldDesc.value = t.description || '';
+        fldDue.value = t.due_date || ''; fldStatus.value = t.status || 'todo';
         document.getElementById('taskModalLabel').textContent = 'Edit Task';
         bsModal.show();
     }
 
     async function saveFromModal() {
-        const payload = {
-            title: fldTitle.value.trim(),
-            description: fldDesc.value.trim(),
-            due_date: fldDue.value || null,
-            status: fldStatus.value || 'todo'
-        };
+        const payload = { title: fldTitle.value.trim(), description: fldDesc.value.trim(), due_date: fldDue.value || null, status: fldStatus.value || 'todo' };
         if (!payload.title) return showToast('Title is required.');
-
         const id = fldId.value;
         const method = id ? 'PUT' : 'POST';
         const url = id ? `/api/tasks/${id}` : '/api/tasks';
-
-        const res = await fetch(url, {
-            method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-            bsModal.hide();
-
-            // FIX 2: If the new task status doesn't match the current filter, switch filter to 'All'
-            // so the user sees the new task immediately.
-            if (currentFilter !== 'all' && payload.status !== currentFilter) {
-                setFilter('all', 'All');
-            }
-
-            await loadTasks();
-        }
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (res.ok) { bsModal.hide(); if (currentFilter !== 'all' && payload.status !== currentFilter) setFilter('all', 'All Tasks'); await loadTasks(); }
     }
 
-    // Delete Logic
     const deleteModal = new bootstrap.Modal(document.getElementById('deleteTaskModal'));
     const deleteModalBody = document.getElementById('deleteModalBody');
     const deleteTaskIdFld = document.getElementById('deleteTaskId');
     const deleteIsBulkFld = document.getElementById('deleteIsBulk');
 
     function openDeleteModalForSingle(id) {
-        deleteModalBody.textContent = 'Delete this task?';
-        deleteTaskIdFld.value = id;
-        deleteIsBulkFld.value = 'false';
-        deleteModal.show();
+        deleteModalBody.textContent = 'Delete this task?'; deleteTaskIdFld.value = id; deleteIsBulkFld.value = 'false'; deleteModal.show();
     }
 
-    document.getElementById('bulkDeleteBtn').addEventListener('click', () => {
-        if (!selected.size) return;
-        deleteModalBody.textContent = `Delete ${selected.size} tasks?`;
-        deleteIsBulkFld.value = 'true';
-        deleteModal.show();
+    delBtn.addEventListener('click', () => {
+        if (selected.size === 0) return;
+        deleteModalBody.textContent = `Move ${selected.size} tasks to bin?`; deleteIsBulkFld.value = 'true'; deleteModal.show();
     });
+    clearSelBtn.addEventListener('click', clearSelection);
 
     document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
         const isBulk = deleteIsBulkFld.value === 'true';
         if (isBulk) {
-            await fetch('/api/tasks/bulk_delete', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids: [...selected] })
-            });
-            selected.clear();
+            await fetch('/api/tasks/bulk_delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [...selected] }) });
+            selected.clear(); updateBulkUI();
         } else {
             const id = deleteTaskIdFld.value;
             await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
             selected.delete(Number(id));
         }
-        deleteModal.hide();
-        await loadTasks();
+        deleteModal.hide(); await loadTasks();
     });
 
-    // Init
     newBtn.addEventListener('click', openModalForCreate);
     document.getElementById('saveTaskBtn').addEventListener('click', saveFromModal);
     document.querySelectorAll('.dropdown-item[data-filter]').forEach(l => {
-        l.addEventListener('click', (e) => {
-            e.preventDefault();
-            setFilter(e.target.dataset.filter, e.target.textContent);
-        });
+        l.addEventListener('click', (e) => { e.preventDefault(); setFilter(e.target.dataset.filter, e.target.textContent); });
     });
 
     loadTasks();

@@ -3,15 +3,12 @@
 
 {% block head_extra %}
 <style>
-    /* --- Layout Constraint --- */
+    /* ... (Keep all existing CSS exactly the same) ... */
     .main-content-wrapper {
         max-width: 1200px;
-        /* Constrains total width (Tasks + Sidebar) */
         margin: 0 auto;
-        /* Centers the content */
     }
 
-    /* --- General Task Styles --- */
     .task-row {
         background: #fff;
         border: 1px solid var(--bs-border-color);
@@ -36,7 +33,6 @@
         border-color: #0d6efd;
     }
 
-    /* Status Colors */
     .task-row.status-todo {
         border-left-color: #6c757d;
     }
@@ -77,45 +73,76 @@
         letter-spacing: 0.5px;
     }
 
-    /* --- Workspace Sidebar Styles --- */
-    .workspace-link {
-        display: block;
-        padding: 6px 8px;
-        border-radius: 4px;
-        color: #333;
-        text-decoration: none;
-        transition: background 0.2s;
-        font-size: 0.95rem;
-    }
-
-    .workspace-link:hover {
-        background-color: #f3f4f6;
-        color: #000;
-    }
-
-    .ws-item-container {
+    .stat-row {
         display: flex;
-        align-items: center;
         justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f0f0f0;
     }
 
-    .quick-add-page-btn {
-        opacity: 0;
-        transition: opacity 0.2s;
-        color: #888;
-        padding: 2px 6px;
-        border-radius: 4px;
-        background: transparent;
-        border: none;
+    .stat-row:last-child {
+        border-bottom: none;
     }
 
-    .ws-item-container:hover .quick-add-page-btn {
-        opacity: 1;
+    .stat-count {
+        font-weight: 700;
+        font-size: 1.1rem;
     }
 
-    .quick-add-page-btn:hover {
-        background-color: #e9ecef;
+    .text-overdue {
+        color: #dc3545;
+    }
+
+    .text-today {
         color: #0d6efd;
+    }
+
+    .text-completed {
+        color: #198754;
+    }
+
+    .transition-fade {
+        transition: opacity 0.2s ease-in-out;
+    }
+
+    .recent-note-item {
+        display: block;
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .recent-note-item:last-child {
+        border-bottom: none;
+    }
+
+    .recent-note-item:hover {
+        padding-left: 5px;
+    }
+
+    .recent-title {
+        font-weight: 600;
+        color: #333;
+        font-size: 0.9rem;
+        display: block;
+    }
+
+    .recent-meta {
+        font-size: 0.75rem;
+        color: #888;
+    }
+
+    .shortcut-card {
+        transition: transform 0.2s, border-color 0.2s;
+        cursor: pointer;
+        border: 1px solid var(--bs-border-color);
+    }
+
+    .shortcut-card:hover {
+        transform: translateY(-2px);
+        border-color: #0d6efd;
     }
 </style>
 {% endblock %}
@@ -127,16 +154,14 @@
         <div class="col-12 col-xl-9">
             <div class="card shadow-sm border-0">
                 <div class="card-body p-4">
-                    <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div id="defaultHeader"
+                        class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom transition-fade">
                         <h1 class="h4 mb-0 fw-bold text-dark">Tasks</h1>
-
-                        <div class="d-flex align-items-center gap-2">
-                            <!-- Filter Dropdown -->
+                        <div class="d-flex align-items-center gap-3">
                             <div class="dropdown">
                                 <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
                                     data-bs-toggle="dropdown">
-                                    <i class="bi bi-filter"></i> Filter: <span id="filterLabel"
-                                        class="fw-bold">All</span>
+                                    <i class="bi bi-funnel"></i> <span id="filterLabel">Filter: All</span>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li><a class="dropdown-item" href="#" data-filter="all">All Tasks</a></li>
@@ -148,153 +173,136 @@
                                     <li><a class="dropdown-item" href="#" data-filter="done">Done</a></li>
                                 </ul>
                             </div>
-
-                            <button id="bulkDeleteBtn" class="btn btn-sm btn-danger" disabled>
-                                <i class="bi bi-trash"></i>
-                            </button>
-                            <button id="newTaskBtn" class="btn btn-sm btn-primary">
-                                <i class="bi bi-plus-lg me-1"></i>New Task
-                            </button>
+                            <button id="newTaskBtn" class="btn btn-sm btn-primary px-3"><i
+                                    class="bi bi-plus-lg me-1"></i>New Task</button>
                         </div>
                     </div>
-
+                    <div id="selectionHeader"
+                        class="d-none align-items-center justify-content-between pb-2 pt-2 px-3 mb-4 border rounded bg-primary-subtle text-primary-emphasis transition-fade">
+                        <div class="d-flex align-items-center gap-3">
+                            <button id="clearSelectionBtn"
+                                class="btn btn-sm btn-link text-decoration-none text-dark p-0"><i
+                                    class="bi bi-x-lg"></i></button>
+                            <span class="fw-bold"><span id="selectedCount">0</span> selected</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button id="bulkDeleteBtn" class="btn btn-sm btn-danger"><i class="bi bi-trash3 me-1"></i>
+                                Move to Bin</button>
+                        </div>
+                    </div>
                     <div id="taskList"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Right Column: Sidebar -->
+        <!-- Right Column -->
         <div class="col-12 col-xl-3">
-
-            <!-- Quick Links Card -->
-            <div class="card shadow-sm border-0 mb-3">
-                <div class="card-body">
-                    <h2 class="h6 fw-bold text-secondary mb-3">Quick Links</h2>
-                    <div class="d-grid gap-2">
-                        <a href="/profile" class="btn btn-light btn-sm text-start"><i
-                                class="bi bi-person me-2"></i>Profile</a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Workspaces Card -->
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h2 class="h6 fw-bold text-secondary mb-0">Workspaces</h2>
-                        <button class="btn btn-sm btn-link text-secondary p-0" data-bs-toggle="modal"
-                            data-bs-target="#createWsModal" title="New Workspace">
-                            <i class="bi bi-plus-lg"></i>
-                        </button>
-                    </div>
-
-                    <div id="workspaceListContainer">
-                        {% if user.workspaces|length == 0 %}
-                        <p class="text-muted small fst-italic">No workspaces yet.</p>
-                        {% else %}
-                        {% for ws in user.workspaces %}
-                        <div class="ws-item-container mb-1">
-                            <a href="/workspaces/{{ ws.id }}" class="workspace-link text-truncate flex-grow-1">
-                                <i class="bi bi-kanban me-2 text-secondary"></i>{{ ws.name }}
-                            </a>
-                            <button class="quick-add-page-btn" onclick="quickCreatePage({{ ws.id }})"
-                                title="Create page inside">
-                                <i class="bi bi-plus"></i>
-                            </button>
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <div class="card shadow-sm border-0 h-100 shortcut-card" onclick="openFocusModal()">
+                        <div class="card-body p-2 text-center">
+                            <i class="bi bi-hourglass-split text-primary fs-4 mb-1 d-block"></i>
+                            <span class="small fw-bold text-dark">Focus 25m</span>
                         </div>
-                        {% endfor %}
-                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card shadow-sm border-0 h-100 shortcut-card" onclick="openDailyNote()">
+                        <div class="card-body p-2 text-center">
+                            <i class="bi bi-journal-bookmark-fill text-success fs-4 mb-1 d-block"></i>
+                            <span class="small fw-bold text-dark">Daily Note</span>
+                        </div>
                     </div>
                 </div>
             </div>
-
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body py-3">
+                    <h2 class="h6 fw-bold text-secondary mb-3">Overview</h2>
+                    <div class="stat-row"><span>Today</span><span class="stat-count text-today" id="stat-today">0</span>
+                    </div>
+                    <div class="stat-row"><span>Overdue</span><span class="stat-count text-overdue"
+                            id="stat-overdue">0</span></div>
+                    <div class="stat-row"><span>Completed</span><span class="stat-count text-completed"
+                            id="stat-completed">0</span></div>
+                    <div class="mt-2 pt-2 border-top text-center"><small class="text-muted"
+                            style="font-size: 0.8rem;">Pending Total: <strong id="stat-total">0</strong></small></div>
+                </div>
+            </div>
+            <div class="card shadow-sm border-0">
+                <div class="card-body py-3">
+                    <h2 class="h6 fw-bold text-secondary mb-3">Recent Notes</h2>
+                    <div id="recentNotesList">
+                        <p class="text-muted small text-center mb-0">Loading...</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Task New/Edit Modal -->
+<!-- Existing Modals (Task, Delete) -->
 <div class="modal fade" id="taskModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="taskModalLabel">New Task</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="taskModalLabel">New Task</h5><button type="button" class="btn-close"
+                    data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="taskForm">
-                    <input type="hidden" id="taskId">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small">Title</label>
-                        <input class="form-control" id="taskTitle" placeholder="What needs to be done?" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small">Description</label>
-                        <textarea class="form-control" id="taskDesc" rows="3"></textarea>
-                    </div>
+                <form id="taskForm"><input type="hidden" id="taskId">
+                    <div class="mb-3"><label class="form-label fw-bold small">Title</label><input class="form-control"
+                            id="taskTitle" placeholder="What needs to be done?" required></div>
+                    <div class="mb-3"><label class="form-label fw-bold small">Description</label><textarea
+                            class="form-control" id="taskDesc" rows="3"></textarea></div>
                     <div class="row">
-                        <div class="col-6 mb-3">
-                            <label class="form-label fw-bold small">Due Date</label>
-                            <input type="date" class="form-control" id="taskDue">
-                        </div>
-                        <div class="col-6 mb-3">
-                            <label class="form-label fw-bold small">Status</label>
-                            <select class="form-select" id="taskStatus">
+                        <div class="col-6 mb-3"><label class="form-label fw-bold small">Due Date</label><input
+                                type="date" class="form-control" id="taskDue"></div>
+                        <div class="col-6 mb-3"><label class="form-label fw-bold small">Status</label><select
+                                class="form-select" id="taskStatus">
                                 <option value="todo">To Do</option>
                                 <option value="in_progress">In Progress</option>
                                 <option value="done">Done</option>
-                            </select>
-                        </div>
+                            </select></div>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer bg-light">
-                <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button id="saveTaskBtn" class="btn btn-primary btn-sm px-4">Save</button>
-            </div>
+            <div class="modal-footer bg-light"><button class="btn btn-outline-secondary btn-sm"
+                    data-bs-dismiss="modal">Cancel</button><button id="saveTaskBtn"
+                    class="btn btn-primary btn-sm px-4">Save</button></div>
         </div>
     </div>
 </div>
-
-<!-- Task Delete Confirmation -->
 <div class="modal fade" id="deleteTaskModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Confirm Delete</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title">Confirm Delete</h5><button type="button" class="btn-close"
+                    data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p id="deleteModalBody" class="mb-0"></p>
-                <input type="hidden" id="deleteTaskId">
-                <input type="hidden" id="deleteIsBulk" value="false">
+                <p id="deleteModalBody" class="mb-0"></p><input type="hidden" id="deleteTaskId"><input type="hidden"
+                    id="deleteIsBulk" value="false">
             </div>
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" id="confirmDeleteBtn" class="btn btn-danger btn-sm">Delete</button>
-            </div>
+            <div class="modal-footer bg-light"><button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-bs-dismiss="modal">Cancel</button><button type="button" id="confirmDeleteBtn"
+                    class="btn btn-danger btn-sm">Delete</button></div>
         </div>
     </div>
 </div>
 
-<!-- Create Workspace Modal -->
-<div class="modal fade" id="createWsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">New Workspace</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="createWsForm">
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Workspace Name</label>
-                        <input type="text" id="newWsName" class="form-control" placeholder="e.g. Marketing, Personal..."
-                            required>
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Create Workspace</button>
-                    </div>
-                </form>
+<!-- UPDATED: Focus Timer Modal with Pause Button -->
+<div class="modal fade" id="focusModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content text-center">
+            <div class="modal-body py-4">
+                <h5 class="mb-3">Focus Session</h5>
+                <h1 class="display-4 fw-bold mb-4" id="focusTimerDisplay">25:00</h1>
+                <div class="d-grid gap-2">
+                    <button id="startFocusBtn" class="btn btn-primary">Start</button>
+                    <!-- New Pause Button -->
+                    <button id="pauseFocusBtn" class="btn btn-warning d-none">Pause</button>
+                    <button id="stopFocusBtn" class="btn btn-outline-secondary">Stop / Close</button>
+                </div>
             </div>
         </div>
     </div>
@@ -304,27 +312,119 @@
 {% block scripts_extra %}
 <script src="{{ url_for('static', filename='js/tasks.js') }}"></script>
 <script>
-    document.getElementById('createWsForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const name = document.getElementById('newWsName').value.trim();
-        if (!name) return;
+    // 1. Recent Notes
+    async function loadRecentNotes() {
+        const container = document.getElementById('recentNotesList');
         try {
-            const res = await fetch('/api/workspaces', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
-                body: JSON.stringify({ name: name })
-            });
-            if (res.ok) window.location.reload();
-        } catch (err) { console.error(err); alert("Failed to create workspace"); }
+            const res = await fetch('/api/notes/recent');
+            const notes = await res.json();
+            if (notes.length === 0) { container.innerHTML = '<p class="text-muted small fst-italic">No recent notes.</p>'; return; }
+            container.innerHTML = notes.map(n => {
+                const date = new Date(n.updated_at).toLocaleDateString();
+                let cleanTitle = n.title.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+                if (cleanTitle.trim() === "") cleanTitle = "Untitled";
+                return `<a href="/workspaces/${n.workspace_id}" class="recent-note-item"><span class="recent-title"><i class="bi bi-file-text me-2"></i>${cleanTitle}</span><span class="recent-meta ms-4">Edited ${date}</span></a>`;
+            }).join('');
+        } catch (err) { console.error(err); container.innerHTML = '<p class="text-danger small">Error loading.</p>'; }
+    }
+
+    // 2. Daily Note
+    async function openDailyNote() {
+        try {
+            const res = await fetch('/api/notes/daily', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' } });
+            const data = await res.json();
+            if (res.ok) window.location.href = `/workspaces/${data.workspace_id}`;
+        } catch (err) { console.error(err); }
+    }
+
+    // 3. Focus Timer Logic (Start, Pause, Resume, Stop)
+    let countdown;
+    let timeLeft = 25 * 60; // Total seconds
+    let isRunning = false;
+    let isPaused = false;
+
+    const focusModal = new bootstrap.Modal(document.getElementById('focusModal'));
+    const display = document.getElementById('focusTimerDisplay');
+    const startBtn = document.getElementById('startFocusBtn');
+    const pauseBtn = document.getElementById('pauseFocusBtn');
+
+    function updateDisplay() {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        display.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    }
+
+    function resetTimer() {
+        clearInterval(countdown);
+        timeLeft = 25 * 60;
+        isRunning = false;
+        isPaused = false;
+        updateDisplay();
+
+        // Reset UI buttons
+        startBtn.classList.remove('d-none');
+        pauseBtn.classList.add('d-none');
+        pauseBtn.textContent = "Pause";
+    }
+
+    function openFocusModal() {
+        resetTimer();
+        focusModal.show();
+    }
+
+    function tick() {
+        if (timeLeft <= 0) {
+            clearInterval(countdown);
+            isRunning = false;
+            display.textContent = "Done!";
+            new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play().catch(e => { });
+            startBtn.classList.remove('d-none');
+            pauseBtn.classList.add('d-none');
+            return;
+        }
+        timeLeft--;
+        updateDisplay();
+    }
+
+    // Start Button
+    startBtn.addEventListener('click', () => {
+        isRunning = true;
+        isPaused = false;
+
+        startBtn.classList.add('d-none');
+        pauseBtn.classList.remove('d-none');
+        pauseBtn.textContent = "Pause";
+
+        countdown = setInterval(tick, 1000);
     });
 
-    async function quickCreatePage(wsId) {
-        try {
-            const res = await fetch(`/api/workspaces/${wsId}/notes`, {
-                method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
-            });
-            if (res.ok) window.location.href = `/workspaces/${wsId}`;
-        } catch (err) { console.error(err); alert("Could not create page."); }
-    }
+    // Pause/Resume Button
+    pauseBtn.addEventListener('click', () => {
+        if (isPaused) {
+            // RESUME
+            isPaused = false;
+            pauseBtn.textContent = "Pause";
+            countdown = setInterval(tick, 1000);
+        } else {
+            // PAUSE
+            clearInterval(countdown);
+            isPaused = true;
+            pauseBtn.textContent = "Resume";
+        }
+    });
+
+    // Stop/Close Button
+    document.getElementById('stopFocusBtn').addEventListener('click', () => {
+        // If timer is running or paused (not finished or idle), ask confirmation
+        if (isRunning) {
+            if (!confirm("Focus session is active. Stop and close?")) {
+                return;
+            }
+        }
+        resetTimer();
+        focusModal.hide();
+    });
+
+    loadRecentNotes();
 </script>
 {% endblock %}
