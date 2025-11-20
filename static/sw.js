@@ -1,13 +1,12 @@
-const CACHE_NAME = 'nobu-cache-v2';
+const CACHE_NAME = 'nobu-cache-v3';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/static/style-dashboard.css',
+  '/tasks',
   '/static/style-home.css',
   '/static/style-login.css',
   '/static/style-register.css',
-  '/static/js/workspaces.js',
   '/static/icon-192.png',
   '/static/icon-512.png',
+  '/static/manifest.json',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
   'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap',

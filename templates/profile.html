@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Profile • Nobu{% endblock %}
+{% block title %}Nobu{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -62,15 +62,6 @@
   </div>
 
   <div class="col-12 col-xl-3">
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
-        <h2 class="h6">Quick Stats</h2>
-        <ul class="list-unstyled small mb-0">
-          <li>Notes — {{ user.notes|length }}</li>
-          <li>User ID — {{ user.id }}</li>
-        </ul>
-      </div>
-    </div>
     <div class="card shadow-sm">
       <div class="card-body">
         <h2 class="h6">Shortcuts</h2>

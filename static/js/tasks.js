@@ -1,244 +1,330 @@
-(() => {
-    const listEl = document.getElementById('taskList');
+document.addEventListener('DOMContentLoaded', () => {
+    // State
+    let tasksData = [];
+    let currentSort = 'manual';
+    let currentFilter = 'all';
+    let selectedTaskIds = new Set();
+
+    // DOM Elements
+    const taskListEl = document.getElementById('taskList');
+    const taskModalEl = document.getElementById('taskModal');
+    const taskModal = new bootstrap.Modal(taskModalEl);
+    const deleteTaskModal = new bootstrap.Modal(document.getElementById('deleteTaskModal'));
+
+    // Buttons & Inputs
+    const newTaskBtn = document.getElementById('newTaskBtn');
+    const saveTaskBtn = document.getElementById('saveTaskBtn');
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+
+    // Headers
     const defaultHeader = document.getElementById('defaultHeader');
     const selectionHeader = document.getElementById('selectionHeader');
-    const newBtn = document.getElementById('newTaskBtn');
-    const delBtn = document.getElementById('bulkDeleteBtn');
-    const clearSelBtn = document.getElementById('clearSelectionBtn');
-    const selectedCountSpan = document.getElementById('selectedCount');
-    const filterLabel = document.getElementById('filterLabel');
+    const selectedCountEl = document.getElementById('selectedCount');
 
-    const modalEl = document.getElementById('taskModal');
-    const bsModal = new bootstrap.Modal(modalEl);
-    const form = document.getElementById('taskForm');
-    const fldId = document.getElementById('taskId');
-    const fldTitle = document.getElementById('taskTitle');
-    const fldDesc = document.getElementById('taskDesc');
-    const fldDue = document.getElementById('taskDue');
-    const fldStatus = document.getElementById('taskStatus');
+    // Inputs
+    const inpId = document.getElementById('taskId');
+    const inpTitle = document.getElementById('taskTitle');
+    const inpDesc = document.getElementById('taskDesc');
+    const inpDue = document.getElementById('taskDue');
+    const inpStatus = document.getElementById('taskStatus');
 
-    let currentFilter = 'all';
-    let selected = new Set();
-    let sortableInstance = null;
+    // CSRF
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-    // --- SORTABLE INIT (Always active unless filtered) ---
-    function initSortable() {
-        if (sortableInstance) sortableInstance.destroy();
+    // --- Initialization ---
+    loadTasks();
 
-        if (currentFilter === 'all') {
-            sortableInstance = new Sortable(listEl, {
-                animation: 150,
-                handle: '.task-row',
-                onEnd: function (evt) {
-                    saveOrder();
-                }
-            });
-            listEl.classList.remove('sort-disabled');
-        } else {
-            listEl.classList.add('sort-disabled');
-        }
-    }
+    // --- Event Listeners ---
 
-    async function saveOrder() {
-        const rows = Array.from(listEl.querySelectorAll('.task-row'));
-        const orderedIds = rows.map(row => parseInt(row.dataset.id));
-        try {
-            await fetch('/api/tasks/reorder', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids: orderedIds })
-            });
-        } catch (e) { console.error("Failed to save order", e); }
-    }
+    // 1. New Task
+    newTaskBtn.addEventListener('click', () => {
+        resetForm();
+        taskModal.show();
+    });
 
-    function getStatusMeta(status) {
-        switch (status) {
-            case 'done': return { label: 'Done', badgeClass: 'bg-success', rowClass: 'status-done' };
-            case 'in_progress': return { label: 'In Progress', badgeClass: 'bg-warning text-dark', rowClass: 'status-inprogress' };
-            default: return { label: 'To Do', badgeClass: 'bg-secondary', rowClass: 'status-todo' };
-        }
-    }
+    // 2. Save Task (Create or Update)
+    saveTaskBtn.addEventListener('click', async () => {
+        const id = inpId.value;
+        const title = inpTitle.value.trim();
+        const description = inpDesc.value.trim();
+        const due_date = inpDue.value;
+        const status = inpStatus.value;
 
-    function rowTemplate(t) {
-        const rawStatus = t.status || (t.completed ? 'done' : 'todo');
-        const meta = getStatusMeta(rawStatus);
-        const due = t.due_date ? `<span class="ms-2 text-muted"><i class="bi bi-calendar-event me-1"></i>${t.due_date}</span>` : '';
-        const isSelected = selected.has(t.id);
-        const checkedAttr = isSelected ? 'checked' : '';
-        const selectionClass = isSelected ? 'selected-row' : '';
-        const cursorStyle = (currentFilter === 'all') ? 'cursor: grab;' : 'cursor: default;';
-
-        return `
-      <div class="task-row ${meta.rowClass} ${selectionClass}" data-id="${t.id}" data-status="${rawStatus}" style="${cursorStyle}">
-        <input type="checkbox" class="form-check-input task-check mt-1" ${checkedAttr} />
-        <div class="flex-grow-1 ms-2">
-          <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
-            <span class="task-title">${escapeHtml(t.title)}</span>
-            <span class="badge ${meta.badgeClass} badge-status rounded-pill">${meta.label}</span>
-          </div>
-          <div class="task-meta">
-            ${t.description ? `<span class="me-2">${escapeHtml(t.description)}</span>` : ''}
-            ${due}
-          </div>
-        </div>
-        <div class="d-flex align-items-center gap-1">
-          <button class="btn btn-sm btn-light text-secondary btn-edit" title="Edit"><i class="bi bi-pencil"></i></button>
-          <button class="btn btn-sm btn-light text-danger btn-del" title="Delete"><i class="bi bi-trash"></i></button>
-        </div>
-      </div>`;
-    }
-
-    function escapeHtml(s) { return (s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
-
-    function setFilter(newFilter, labelText) {
-        currentFilter = newFilter;
-        filterLabel.textContent = "Filter: " + labelText;
-        applyFilter();
-        initSortable();
-    }
-
-    function applyFilter() {
-        let visibleCount = 0;
-        [...listEl.querySelectorAll('.task-row')].forEach(row => {
-            const st = row.dataset.status;
-            const show = (currentFilter === 'all' || st === currentFilter);
-            row.style.display = show ? 'flex' : 'none';
-            if (show) visibleCount++;
-        });
-    }
-
-    function calculateStats(items) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        let overdueCount = 0, todayCount = 0, completedCount = 0, pendingTotal = 0;
-        items.forEach(t => {
-            const isDone = (t.status === 'done' || t.completed);
-            if (isDone) { completedCount++; } else {
-                pendingTotal++;
-                if (t.due_date === todayStr) todayCount++;
-                if (t.due_date && t.due_date < todayStr) overdueCount++;
-            }
-        });
-        const elToday = document.getElementById('stat-today');
-        const elOverdue = document.getElementById('stat-overdue');
-        const elCompleted = document.getElementById('stat-completed');
-        const elTotal = document.getElementById('stat-total');
-        if (elToday) elToday.textContent = todayCount;
-        if (elOverdue) elOverdue.textContent = overdueCount;
-        if (elCompleted) elCompleted.textContent = completedCount;
-        if (elTotal) elTotal.textContent = pendingTotal;
-    }
-
-    async function loadTasks() {
-        try {
-            const res = await fetch('/api/tasks?ts=' + Date.now());
-            const items = await res.json();
-
-            if (items.length === 0) {
-                listEl.innerHTML = `<div class="text-center py-5 text-muted"><i class="bi bi-clipboard-check display-4"></i><p class="mt-2">No tasks found. Create one!</p></div>`;
-            } else {
-                listEl.innerHTML = items.map(rowTemplate).join('');
-            }
-            applyFilter();
-            selected.clear(); updateBulkUI();
-            calculateStats(items);
-            initSortable();
-        } catch (e) { console.error(e); }
-    }
-
-    function toggleSelected(id, state) {
-        if (state) selected.add(id); else selected.delete(id);
-        updateBulkUI();
-    }
-
-    function updateBulkUI() {
-        if (selected.size > 0) {
-            defaultHeader.classList.remove('d-flex'); defaultHeader.classList.add('d-none');
-            selectionHeader.classList.remove('d-none'); selectionHeader.classList.add('d-flex');
-            selectedCountSpan.textContent = selected.size;
-        } else {
-            selectionHeader.classList.remove('d-flex'); selectionHeader.classList.add('d-none');
-            defaultHeader.classList.remove('d-none'); defaultHeader.classList.add('d-flex');
-        }
-    }
-
-    function clearSelection() {
-        selected.clear();
-        document.querySelectorAll('.task-check').forEach(cb => cb.checked = false);
-        document.querySelectorAll('.task-row').forEach(r => r.classList.remove('selected-row'));
-        updateBulkUI();
-    }
-
-    listEl.addEventListener('click', (e) => {
-        const row = e.target.closest('.task-row');
-        if (!row) return;
-        const id = Number(row.dataset.id);
-        const checkbox = row.querySelector('.task-check');
-
-        if (e.target.closest('.btn-del')) {
-            e.preventDefault(); e.stopPropagation(); openDeleteModalForSingle(id); return;
-        }
-        if (e.target.closest('.btn-edit')) {
-            e.preventDefault(); e.stopPropagation();
-            fetch(`/api/tasks`).then(r => r.json()).then(all => { const task = all.find(x => x.id === id); openModalForEdit(task); });
+        // VALIDATION: Check if title is empty
+        if (!title) {
+            // Uses the global showToast function from base.html
+            showToast("Title is required", "warning");
+            // Shake the input to give visual feedback
+            inpTitle.classList.add('is-invalid');
+            setTimeout(() => inpTitle.classList.remove('is-invalid'), 2000);
             return;
         }
 
-        const newState = !checkbox.checked;
-        if (!e.target.classList.contains('task-check')) checkbox.checked = newState;
-        toggleSelected(id, checkbox.checked);
-        if (checkbox.checked) row.classList.add('selected-row');
-        else row.classList.remove('selected-row');
-    });
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/api/tasks/${id}` : '/api/tasks';
 
-    function openModalForCreate() {
-        form.reset(); fldId.value = '';
-        fldStatus.value = ['todo', 'in_progress', 'done'].includes(currentFilter) ? currentFilter : 'todo';
-        document.getElementById('taskModalLabel').textContent = 'New Task'; bsModal.show();
-    }
-    function openModalForEdit(t) {
-        form.reset(); fldId.value = t.id; fldTitle.value = t.title || ''; fldDesc.value = t.description || '';
-        fldDue.value = t.due_date || ''; fldStatus.value = t.status || 'todo';
-        document.getElementById('taskModalLabel').textContent = 'Edit Task'; bsModal.show();
-    }
-    async function saveFromModal() {
-        const payload = { title: fldTitle.value.trim(), description: fldDesc.value.trim(), due_date: fldDue.value || null, status: fldStatus.value || 'todo' };
-        if (!payload.title) return;
-        const id = fldId.value; const method = id ? 'PUT' : 'POST'; const url = id ? `/api/tasks/${id}` : '/api/tasks';
-        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (res.ok) { bsModal.hide(); if (currentFilter !== 'all' && payload.status !== currentFilter) setFilter('all', 'All Tasks'); await loadTasks(); }
-    }
+        try {
+            const res = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ title, description, due_date, status })
+            });
 
-    const deleteModal = new bootstrap.Modal(document.getElementById('deleteTaskModal'));
-    const deleteModalBody = document.getElementById('deleteModalBody');
-    const deleteTaskIdFld = document.getElementById('deleteTaskId');
-    const deleteIsBulkFld = document.getElementById('deleteIsBulk');
-
-    function openDeleteModalForSingle(id) {
-        deleteModalBody.textContent = 'Delete this task?'; deleteTaskIdFld.value = id; deleteIsBulkFld.value = 'false'; deleteModal.show();
-    }
-    delBtn.addEventListener('click', () => {
-        if (selected.size === 0) return;
-        deleteModalBody.textContent = `Move ${selected.size} tasks to bin?`; deleteIsBulkFld.value = 'true'; deleteModal.show();
-    });
-    clearSelBtn.addEventListener('click', clearSelection);
-
-    document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
-        const isBulk = deleteIsBulkFld.value === 'true';
-        if (isBulk) {
-            await fetch('/api/tasks/bulk_delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [...selected] }) });
-            selected.clear(); updateBulkUI();
-        } else {
-            const id = deleteTaskIdFld.value; await fetch(`/api/tasks/${id}`, { method: 'DELETE' }); selected.delete(Number(id));
+            if (res.ok) {
+                taskModal.hide();
+                loadTasks();
+                showToast(id ? "Task updated" : "Task created", "success");
+            } else {
+                showToast("Failed to save task", "danger");
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Network error", "danger");
         }
-        deleteModal.hide(); await loadTasks();
     });
 
-    newBtn.addEventListener('click', openModalForCreate);
-    document.getElementById('saveTaskBtn').addEventListener('click', saveFromModal);
-
-    document.querySelectorAll('.dropdown-item[data-filter]').forEach(l => {
-        l.addEventListener('click', (e) => { e.preventDefault(); setFilter(e.target.dataset.filter, e.target.textContent); });
+    // 3. Sorting
+    document.querySelectorAll('[data-sort]').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            currentSort = e.target.dataset.sort;
+            document.getElementById('sortLabel').innerText = e.target.innerText;
+            renderTasks(); // Re-render with new sort
+        });
     });
 
-    loadTasks();
-})();
+    // 4. Filtering
+    document.querySelectorAll('[data-filter]').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            currentFilter = e.target.dataset.filter;
+            document.getElementById('filterLabel').innerText = `Filter: ${e.target.innerText}`;
+            loadTasks(); // Reload from server (or re-render if caching)
+        });
+    });
+
+    // 5. Bulk Actions
+    clearSelectionBtn.addEventListener('click', () => {
+        selectedTaskIds.clear();
+        updateSelectionUI();
+        renderTasks();
+    });
+
+    bulkDeleteBtn.addEventListener('click', () => {
+        if (selectedTaskIds.size === 0) return;
+        document.getElementById('deleteModalBody').innerText = `Are you sure you want to delete ${selectedTaskIds.size} tasks?`;
+        document.getElementById('deleteIsBulk').value = 'true';
+        deleteTaskModal.show();
+    });
+
+    confirmDeleteBtn.addEventListener('click', async () => {
+        const isBulk = document.getElementById('deleteIsBulk').value === 'true';
+
+        if (isBulk) {
+            const ids = Array.from(selectedTaskIds);
+            try {
+                const res = await fetch('/api/tasks/bulk_delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                    body: JSON.stringify({ ids })
+                });
+                if (res.ok) {
+                    selectedTaskIds.clear();
+                    updateSelectionUI();
+                    loadTasks();
+                    deleteTaskModal.hide();
+                    showToast("Tasks moved to trash", "success");
+                }
+            } catch (e) { console.error(e); }
+        } else {
+            const id = document.getElementById('deleteTaskId').value;
+            try {
+                const res = await fetch(`/api/tasks/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+                if (res.ok) {
+                    loadTasks();
+                    deleteTaskModal.hide();
+                    showToast("Task moved to trash", "success");
+                }
+            } catch (e) { console.error(e); }
+        }
+    });
+
+
+    // --- Functions ---
+
+    async function loadTasks() {
+        taskListEl.innerHTML = '<div class="text-center text-muted py-4">Loading...</div>';
+        try {
+            // Fetch with status filter if needed, otherwise filter client side
+            let url = '/api/tasks';
+            if (currentFilter !== 'all') url += `?status=${currentFilter}`;
+
+            const res = await fetch(url);
+            tasksData = await res.json();
+            renderTasks();
+        } catch (err) {
+            console.error(err);
+            taskListEl.innerHTML = '<div class="text-center text-danger py-4">Error loading tasks.</div>';
+        }
+    }
+
+    function renderTasks() {
+        // 1. Sort Data
+        let displayData = [...tasksData];
+        if (currentSort === 'due_asc') {
+            displayData.sort((a, b) => {
+                if (!a.due_date) return 1;
+                if (!b.due_date) return -1;
+                return new Date(a.due_date) - new Date(b.due_date);
+            });
+        } else if (currentSort === 'newest') {
+            displayData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        } else if (currentSort === 'alpha') {
+            displayData.sort((a, b) => a.title.localeCompare(b.title));
+        } else {
+            // Manual: sort by position
+            displayData.sort((a, b) => a.position - b.position);
+        }
+
+        if (displayData.length === 0) {
+            taskListEl.innerHTML = `
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-clipboard-check display-4 mb-3 d-block opacity-50"></i>
+                    <p>No tasks found. Create one!</p>
+                </div>
+            `;
+            return;
+        }
+
+        taskListEl.innerHTML = displayData.map(t => createTaskHTML(t)).join('');
+
+        // Re-init Sortable only if sort is manual
+        if (currentSort === 'manual') {
+            initSortable();
+        }
+    }
+
+    function createTaskHTML(t) {
+        const isSelected = selectedTaskIds.has(t.id);
+        const statusClass = t.status === 'todo' ? 'status-todo' : (t.status === 'in_progress' ? 'status-inprogress' : 'status-done');
+        const badgeClass = t.status === 'todo' ? 'bg-secondary' : (t.status === 'in_progress' ? 'bg-warning text-dark' : 'bg-success');
+        const statusLabel = t.status === 'todo' ? 'To Do' : (t.status === 'in_progress' ? 'In Progress' : 'Done');
+        const checkIcon = isSelected ? 'bi-check-circle-fill text-primary' : 'bi-circle text-muted';
+
+        // Due date formatting
+        let dueHtml = '';
+        if (t.due_date) {
+            const d = new Date(t.due_date);
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            const isOverdue = d < now && t.status !== 'done';
+            dueHtml = `<small class="me-3 ${isOverdue ? 'text-danger fw-bold' : ''}"><i class="bi bi-calendar-event me-1"></i>${d.toLocaleDateString()}</small>`;
+        }
+
+        return `
+        <div class="task-row ${statusClass} ${isSelected ? 'selected-row' : ''}" data-id="${t.id}">
+            <div class="pt-1">
+                <i class="bi ${checkIcon} task-check" onclick="toggleSelection(${t.id}, event)"></i>
+            </div>
+            <div class="flex-grow-1" onclick="editTask(${t.id})">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div class="task-title mb-1">${escapeHtml(t.title)}</div>
+                    <span class="badge ${badgeClass} badge-status ms-2">${statusLabel}</span>
+                </div>
+                <div class="task-meta">
+                    ${dueHtml}
+                    <span class="text-truncate d-inline-block" style="max-width: 300px; vertical-align: bottom;">${escapeHtml(t.description)}</span>
+                </div>
+            </div>
+            <div class="dropdown">
+                <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><button class="dropdown-item" onclick="editTask(${t.id})"><i class="bi bi-pencil me-2"></i>Edit</button></li>
+                    <li><button class="dropdown-item text-danger" onclick="promptDelete(${t.id})"><i class="bi bi-trash me-2"></i>Delete</button></li>
+                </ul>
+            </div>
+        </div>
+        `;
+    }
+
+    function initSortable() {
+        new Sortable(taskListEl, {
+            animation: 150,
+            ghostClass: 'bg-light',
+            onEnd: async function () {
+                // Get new order
+                const ids = Array.from(taskListEl.children).map(row => row.dataset.id);
+                await fetch('/api/tasks/reorder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                    body: JSON.stringify({ ids })
+                });
+            }
+        });
+    }
+
+    function resetForm() {
+        inpId.value = '';
+        inpTitle.value = '';
+        inpDesc.value = '';
+        inpDue.value = '';
+        inpStatus.value = 'todo';
+        inpTitle.classList.remove('is-invalid');
+    }
+
+    // Expose functions to global scope for onclick handlers in HTML
+    window.editTask = (id) => {
+        const t = tasksData.find(x => x.id == id);
+        if (!t) return;
+        inpId.value = t.id;
+        inpTitle.value = t.title;
+        inpDesc.value = t.description;
+        inpDue.value = t.due_date ? t.due_date : '';
+        inpStatus.value = t.status;
+        taskModal.show();
+    };
+
+    window.promptDelete = (id) => {
+        document.getElementById('deleteModalBody').innerText = "Are you sure you want to delete this task?";
+        document.getElementById('deleteTaskId').value = id;
+        document.getElementById('deleteIsBulk').value = 'false';
+        deleteTaskModal.show();
+    };
+
+    window.toggleSelection = (id, e) => {
+        e.stopPropagation();
+        if (selectedTaskIds.has(id)) selectedTaskIds.delete(id);
+        else selectedTaskIds.add(id);
+        updateSelectionUI();
+        renderTasks();
+    };
+
+    function updateSelectionUI() {
+        const count = selectedTaskIds.size;
+        if (count > 0) {
+            defaultHeader.classList.remove('d-flex');
+            defaultHeader.classList.add('d-none');
+            selectionHeader.classList.remove('d-none');
+            selectionHeader.classList.add('d-flex');
+            selectedCountEl.innerText = count;
+        } else {
+            defaultHeader.classList.remove('d-none');
+            defaultHeader.classList.add('d-flex');
+            selectionHeader.classList.remove('d-flex');
+            selectionHeader.classList.add('d-none');
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return "";
+        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+});
