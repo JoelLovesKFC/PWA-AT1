@@ -280,7 +280,6 @@ def api_change_password():
     db.session.commit()
     return jsonify({"status": "success"}), 200
 
-# --- Workspaces ---
 @app.route("/api/workspaces", methods=["GET"])
 @login_required_page
 def list_workspaces():
@@ -308,7 +307,6 @@ def workspace_ops(ws_id):
     db.session.commit()
     return jsonify({"status": "success"}), 200
 
-# ----------------- NOTES API -----------------
 @csrf.exempt
 @app.route("/api/workspaces/<int:ws_id>/notes", methods=["GET", "POST"])
 @login_required_page
@@ -346,7 +344,6 @@ def note_ops(note_id):
     db.session.commit()
     return jsonify({"status": "success"}), 200
 
-# ----------------- TRASH API -----------------
 @app.route("/api/workspaces/<int:ws_id>/trash", methods=["GET"])
 @login_required_page
 def get_trash(ws_id):
