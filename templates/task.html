@@ -3,6 +3,14 @@
 
 {% block head_extra %}
 <style>
+    /* --- Layout Constraint --- */
+    .main-content-wrapper {
+        max-width: 1200px;
+        /* Constrains total width (Tasks + Sidebar) */
+        margin: 0 auto;
+        /* Centers the content */
+    }
+
     /* --- General Task Styles --- */
     .task-row {
         background: #fff;
@@ -113,90 +121,94 @@
 {% endblock %}
 
 {% block content %}
-<div class="row g-3 mt-3">
-    <!-- Left Column: Tasks -->
-    <div class="col-12 col-xl-9">
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-center justify-content-between mb-4">
-                    <h1 class="h4 mb-0 fw-bold text-dark">Tasks</h1>
+<div class="main-content-wrapper">
+    <div class="row g-3 mt-3">
+        <!-- Left Column: Tasks -->
+        <div class="col-12 col-xl-9">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-4">
+                        <h1 class="h4 mb-0 fw-bold text-dark">Tasks</h1>
 
-                    <div class="d-flex align-items-center gap-2">
-                        <!-- Filter Dropdown -->
-                        <div class="dropdown">
-                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
-                                data-bs-toggle="dropdown">
-                                <i class="bi bi-filter"></i> Filter: <span id="filterLabel" class="fw-bold">All</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <!-- Filter Dropdown -->
+                            <div class="dropdown">
+                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
+                                    data-bs-toggle="dropdown">
+                                    <i class="bi bi-filter"></i> Filter: <span id="filterLabel"
+                                        class="fw-bold">All</span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="#" data-filter="all">All Tasks</a></li>
+                                    <li>
+                                        <hr class="dropdown-divider">
+                                    </li>
+                                    <li><a class="dropdown-item" href="#" data-filter="todo">To Do</a></li>
+                                    <li><a class="dropdown-item" href="#" data-filter="in_progress">In Progress</a></li>
+                                    <li><a class="dropdown-item" href="#" data-filter="done">Done</a></li>
+                                </ul>
+                            </div>
+
+                            <button id="bulkDeleteBtn" class="btn btn-sm btn-danger" disabled>
+                                <i class="bi bi-trash"></i>
                             </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" href="#" data-filter="all">All Tasks</a></li>
-                                <li>
-                                    <hr class="dropdown-divider">
-                                </li>
-                                <li><a class="dropdown-item" href="#" data-filter="todo">To Do</a></li>
-                                <li><a class="dropdown-item" href="#" data-filter="in_progress">In Progress</a></li>
-                                <li><a class="dropdown-item" href="#" data-filter="done">Done</a></li>
-                            </ul>
+                            <button id="newTaskBtn" class="btn btn-sm btn-primary">
+                                <i class="bi bi-plus-lg me-1"></i>New Task
+                            </button>
                         </div>
+                    </div>
 
-                        <button id="bulkDeleteBtn" class="btn btn-sm btn-danger" disabled>
-                            <i class="bi bi-trash"></i>
-                        </button>
-                        <button id="newTaskBtn" class="btn btn-sm btn-primary">
-                            <i class="bi bi-plus-lg me-1"></i>New Task
-                        </button>
+                    <div id="taskList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Sidebar -->
+        <div class="col-12 col-xl-3">
+
+            <!-- Quick Links Card -->
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body">
+                    <h2 class="h6 fw-bold text-secondary mb-3">Quick Links</h2>
+                    <div class="d-grid gap-2">
+                        <a href="/profile" class="btn btn-light btn-sm text-start"><i
+                                class="bi bi-person me-2"></i>Profile</a>
                     </div>
                 </div>
-
-                <div id="taskList"></div>
             </div>
-        </div>
-    </div>
 
-    <!-- Right Column: Sidebar -->
-    <div class="col-12 col-xl-3">
-
-        <!-- Quick Links Card -->
-        <div class="card shadow-sm border-0 mb-3">
-            <div class="card-body">
-                <h2 class="h6 fw-bold text-secondary mb-3">Quick Links</h2>
-                <div class="d-grid gap-2">
-                    <a href="/profile" class="btn btn-light btn-sm text-start"><i
-                            class="bi bi-person me-2"></i>Profile</a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Workspaces Card -->
-        <div class="card shadow-sm border-0">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h2 class="h6 fw-bold text-secondary mb-0">Workspaces</h2>
-                    <button class="btn btn-sm btn-link text-secondary p-0" data-bs-toggle="modal"
-                        data-bs-target="#createWsModal" title="New Workspace">
-                        <i class="bi bi-plus-lg"></i>
-                    </button>
-                </div>
-
-                <div id="workspaceListContainer">
-                    {% if user.workspaces|length == 0 %}
-                    <p class="text-muted small fst-italic">No workspaces yet.</p>
-                    {% else %}
-                    {% for ws in user.workspaces %}
-                    <div class="ws-item-container mb-1">
-                        <a href="/workspaces/{{ ws.id }}" class="workspace-link text-truncate flex-grow-1">
-                            <i class="bi bi-kanban me-2 text-secondary"></i>{{ ws.name }}
-                        </a>
-                        <button class="quick-add-page-btn" data-workspace-id="{{ ws.id }}" title="Create page inside">
-                            <i class="bi bi-plus"></i>
+            <!-- Workspaces Card -->
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h2 class="h6 fw-bold text-secondary mb-0">Workspaces</h2>
+                        <button class="btn btn-sm btn-link text-secondary p-0" data-bs-toggle="modal"
+                            data-bs-target="#createWsModal" title="New Workspace">
+                            <i class="bi bi-plus-lg"></i>
                         </button>
                     </div>
-                    {% endfor %}
-                    {% endif %}
+
+                    <div id="workspaceListContainer">
+                        {% if user.workspaces|length == 0 %}
+                        <p class="text-muted small fst-italic">No workspaces yet.</p>
+                        {% else %}
+                        {% for ws in user.workspaces %}
+                        <div class="ws-item-container mb-1">
+                            <a href="/workspaces/{{ ws.id }}" class="workspace-link text-truncate flex-grow-1">
+                                <i class="bi bi-kanban me-2 text-secondary"></i>{{ ws.name }}
+                            </a>
+                            <button class="quick-add-page-btn" onclick="quickCreatePage({{ ws.id }})"
+                                title="Create page inside">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
                 </div>
             </div>
-        </div>
 
+        </div>
     </div>
 </div>
 
@@ -292,57 +304,27 @@
 {% block scripts_extra %}
 <script src="{{ url_for('static', filename='js/tasks.js') }}"></script>
 <script>
-    // Helper function to read the token from the HTML meta tag
-    function getCsrfToken() {
-        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    }
-
-    // Event delegation for workspace quick-add buttons
-    document.addEventListener('click', function (e) {
-        if (e.target.closest('.quick-add-page-btn')) {
-            const btn = e.target.closest('.quick-add-page-btn');
-            const wsId = btn.getAttribute('data-workspace-id');
-            if (wsId) {
-                quickCreatePage(wsId);
-            }
-        }
-    });
-
     document.getElementById('createWsForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = document.getElementById('newWsName').value.trim();
         if (!name) return;
-
         try {
             const res = await fetch('/api/workspaces', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken()
-                },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
                 body: JSON.stringify({ name: name })
             });
             if (res.ok) window.location.reload();
-        } catch (err) {
-            console.error(err);
-            alert("Failed to create workspace");
-        }
+        } catch (err) { console.error(err); alert("Failed to create workspace"); }
     });
 
     async function quickCreatePage(wsId) {
         try {
             const res = await fetch(`/api/workspaces/${wsId}/notes`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCsrfToken()
-                }
+                method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
             });
-
             if (res.ok) window.location.href = `/workspaces/${wsId}`;
-        } catch (err) {
-            console.error(err);
-            alert("Could not create page.");
-        }
+        } catch (err) { console.error(err); alert("Could not create page."); }
     }
 </script>
 {% endblock %}
