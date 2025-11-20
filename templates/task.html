@@ -109,34 +109,6 @@
         transition: opacity 0.2s ease-in-out;
     }
 
-    .recent-note-item {
-        display: block;
-        padding: 8px 0;
-        border-bottom: 1px solid #f0f0f0;
-        text-decoration: none;
-        transition: all 0.2s;
-    }
-
-    .recent-note-item:last-child {
-        border-bottom: none;
-    }
-
-    .recent-note-item:hover {
-        padding-left: 5px;
-    }
-
-    .recent-title {
-        font-weight: 600;
-        color: #333;
-        font-size: 0.9rem;
-        display: block;
-    }
-
-    .recent-meta {
-        font-size: 0.75rem;
-        color: #888;
-    }
-
     .shortcut-card {
         transition: transform 0.2s, border-color 0.2s;
         cursor: pointer;
@@ -252,21 +224,13 @@
                 </div>
             </div>
 
-            <!-- Action Buttons -->
+            <!-- Action Buttons (Modified: Removed Daily Note) -->
             <div class="row g-2 mb-3">
-                <div class="col-6">
+                <div class="col-12">
                     <div class="card shadow-sm border-0 h-100 shortcut-card" onclick="openFocusModal()">
                         <div class="card-body p-2 text-center">
                             <i class="bi bi-hourglass-split text-primary fs-4 mb-1 d-block"></i>
                             <span class="small fw-bold text-dark">Focus 25m</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6">
-                    <div class="card shadow-sm border-0 h-100 shortcut-card" onclick="openDailyNote()">
-                        <div class="card-body p-2 text-center">
-                            <i class="bi bi-journal-bookmark-fill text-success fs-4 mb-1 d-block"></i>
-                            <span class="small fw-bold text-dark">Daily Note</span>
                         </div>
                     </div>
                 </div>
@@ -285,16 +249,6 @@
                     <div class="mt-2 pt-2 text-center">
                         <small class="text-muted" style="font-size: 0.8rem;">Pending Total: <strong
                                 id="stat-total">0</strong></small>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recent Notes -->
-            <div class="card shadow-sm border-0">
-                <div class="card-body py-3">
-                    <h2 class="h6 fw-bold text-secondary mb-3">Recent Notes</h2>
-                    <div id="recentNotesList">
-                        <p class="text-muted small text-center mb-0">Loading...</p>
                     </div>
                 </div>
             </div>
@@ -395,31 +349,6 @@
     updateClock();
     setInterval(updateClock, 1000);
 
-
-    // --- Existing Side Bar Scripts ---
-    async function loadRecentNotes() {
-        const container = document.getElementById('recentNotesList');
-        try {
-            const res = await fetch('/api/notes/recent');
-            const notes = await res.json();
-            if (notes.length === 0) { container.innerHTML = '<p class="text-muted small fst-italic">No recent notes.</p>'; return; }
-            container.innerHTML = notes.map(n => {
-                const date = new Date(n.updated_at).toLocaleDateString();
-                let cleanTitle = n.title.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-                if (cleanTitle.trim() === "") cleanTitle = "Untitled";
-                return `<a href="/workspaces/${n.workspace_id}" class="recent-note-item"><span class="recent-title"><i class="bi bi-file-text me-2"></i>${cleanTitle}</span><span class="recent-meta ms-4">Edited ${date}</span></a>`;
-            }).join('');
-        } catch (err) { console.error(err); container.innerHTML = '<p class="text-danger small">Error loading.</p>'; }
-    }
-
-    async function openDailyNote() {
-        try {
-            const res = await fetch('/api/notes/daily', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token() }}' } });
-            const data = await res.json();
-            if (res.ok) window.location.href = `/workspaces/${data.workspace_id}`;
-        } catch (err) { console.error(err); }
-    }
-
     // Focus Timer Logic
     let countdown;
     let timeLeft = 25 * 60;
@@ -467,7 +396,5 @@
         if (isRunning) { if (!confirm("Focus session is active. Stop and close?")) return; }
         resetTimer(); focusModal.hide();
     });
-
-    loadRecentNotes();
 </script>
 {% endblock %}

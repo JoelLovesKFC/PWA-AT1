@@ -55,7 +55,6 @@ class Workspace(db.Model):
     name = db.Column(db.String(120), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     position = db.Column(db.Integer, default=0)
-    # NEW: Soft delete flag
     is_trashed = db.Column(db.Boolean, default=False, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
@@ -112,12 +111,7 @@ def home():
 def register_page():
     return render_template("register.html")
 
-@app.route("/workspaces/<int:ws_id>")
-@login_required_page
-def workspace_detail(ws_id):
-    ws = Workspace.query.get_or_404(ws_id)
-    if ws.user_id != session["user_id"]: return "Forbidden", 403
-    return render_template("workspace.html", ws=ws)
+# REMOVED: workspace_detail route
 
 @app.route("/dashboard")
 @login_required_page
@@ -343,196 +337,7 @@ def api_change_password():
     db.session.commit()
     return jsonify({"status": "success"}), 200
 
-
-# --- Workspaces ---
-@app.route("/api/workspaces", methods=["GET"])
-@login_required_page
-def list_workspaces():
-    # Filter active (non-trashed) workspaces
-    wss = Workspace.query.filter_by(user_id=session["user_id"], is_trashed=False)\
-                         .order_by(Workspace.position.asc(), Workspace.created_at.desc()).all()
-    return jsonify([{"id": w.id, "name": w.name} for w in wss]), 200
-
-@csrf.exempt
-@app.route("/api/workspaces", methods=["POST"])
-@login_required_page
-def create_workspace():
-    data = request.get_json() or {}
-    name = data.get("name")
-    if not name:
-        count = Workspace.query.filter_by(user_id=session["user_id"]).count()
-        name = f"Workspace {count + 1}"
-    ws = Workspace(name=name, user_id=session["user_id"])
-    db.session.add(ws)
-    db.session.commit()
-    return jsonify({"id": ws.id, "name": ws.name}), 201
-
-@csrf.exempt
-@app.route("/api/workspaces/<int:ws_id>", methods=["PUT", "DELETE"])
-@login_required_page
-def workspace_ops(ws_id):
-    ws = Workspace.query.get_or_404(ws_id)
-    if ws.user_id != session["user_id"]: return jsonify({"status": "error"}), 403
-    
-    if request.method == 'DELETE':
-        # UPDATED: Soft delete instead of hard delete
-        ws.is_trashed = True
-    else:
-        ws.name = request.get_json().get("name")
-    
-    db.session.commit()
-    return jsonify({"status": "success"}), 200
-
-@csrf.exempt
-@app.route("/api/workspaces/reorder", methods=["POST"])
-@login_required_page
-def reorder_workspaces():
-    data = request.get_json() or {}
-    ordered_ids = data.get("ids") or []
-    if not ordered_ids: return jsonify({"status": "success"}), 200
-    wss = Workspace.query.filter(Workspace.user_id == session["user_id"], Workspace.id.in_(ordered_ids)).all()
-    ws_map = {w.id: w for w in wss}
-    for index, w_id in enumerate(ordered_ids):
-        try: w_id = int(w_id)
-        except: continue
-        if w_id in ws_map: ws_map[w_id].position = index
-    db.session.commit()
-    return jsonify({"status": "success"}), 200
-
-# ----------------- NEW: WORKSPACE TRASH API -----------------
-@app.route("/api/trash/workspaces", methods=["GET"])
-@login_required_page
-def get_workspace_trash():
-    # Filter for is_trashed=True
-    wss = Workspace.query.filter_by(user_id=session["user_id"], is_trashed=True)\
-                         .order_by(Workspace.created_at.desc()).all()
-    return jsonify([{"id": w.id, "name": w.name} for w in wss]), 200
-
-@csrf.exempt
-@app.route("/api/workspaces/<int:ws_id>/restore", methods=["POST"])
-@login_required_page
-def restore_workspace(ws_id):
-    ws = Workspace.query.get_or_404(ws_id)
-    if ws.user_id != session["user_id"]: return jsonify({"status": "error"}), 403
-    ws.is_trashed = False
-    db.session.commit()
-    return jsonify({"status": "success"}), 200
-
-@csrf.exempt
-@app.route("/api/workspaces/<int:ws_id>/permanent", methods=["DELETE"])
-@login_required_page
-def hard_delete_workspace(ws_id):
-    ws = Workspace.query.get_or_404(ws_id)
-    if ws.user_id != session["user_id"]: return jsonify({"status": "error"}), 403
-    db.session.delete(ws)
-    db.session.commit()
-    return jsonify({"status": "success"}), 200
-
-
-
-# ----------------- NOTES API -----------------
-
-@csrf.exempt
-@app.route("/api/workspaces/<int:ws_id>/notes", methods=["GET", "POST"])
-@login_required_page
-def ws_notes(ws_id):
-    if not Workspace.query.filter_by(id=ws_id, user_id=session["user_id"]).first():
-        return jsonify({"status": "error", "message": "Forbidden"}), 403
-
-    if request.method == 'POST':
-        empty_block_json = '{"time":1700000000,"blocks":[{"id":"a1","type":"paragraph","data":{"text":""}}],"version":"2.28.0"}'
-        n = Note(title="Untitled", content=empty_block_json, user_id=session["user_id"], workspace_id=ws_id)
-        db.session.add(n)
-        db.session.commit()
-        return jsonify(n.to_dict()), 201
-
-    notes = Note.query.filter_by(user_id=session["user_id"], workspace_id=ws_id, is_trashed=False)\
-                      .order_by(Note.updated_at.desc()).all()
-    return jsonify([n.to_dict() for n in notes]), 200
-
-@app.route("/api/notes/<int:note_id>", methods=["GET"])
-@login_required_page
-def get_single_note(note_id):
-    n = Note.query.get_or_404(note_id)
-    if n.user_id != session["user_id"]: return jsonify({"status": "error", "message": "Forbidden"}), 403
-    return jsonify(n.to_dict()), 200
-
-@csrf.exempt
-@app.route("/api/notes/<int:note_id>", methods=["PUT", "DELETE"])
-@login_required_page
-def note_ops(note_id):
-    n = Note.query.get_or_404(note_id)
-    if n.user_id != session["user_id"]:
-        return jsonify({"status": "error", "message": "Forbidden"}), 403
-
-    if request.method == 'DELETE':
-        n.is_trashed = True
-        db.session.commit()
-        return jsonify({"status": "success"}), 200
-
-    data = request.get_json() or {}
-    if "title" in data: n.title = data["title"]
-    if "content" in data:
-        content_val = data["content"]
-        if isinstance(content_val, (dict, list)):
-            n.content = json.dumps(content_val)
-        else:
-            n.content = content_val
-    db.session.commit()
-    return jsonify({"status": "success"}), 200
-
-# ----------------- RECENT & DAILY API -----------------
-
-@app.route("/api/notes/recent", methods=["GET"])
-@login_required_page
-def get_recent_notes():
-    notes = Note.query.filter_by(user_id=session["user_id"], is_trashed=False)\
-                      .order_by(Note.updated_at.desc()).limit(5).all()
-    return jsonify([{ "id": n.id, "title": n.title, "workspace_id": n.workspace_id, "updated_at": n.updated_at.isoformat() } for n in notes]), 200
-
-@csrf.exempt
-@app.route("/api/notes/daily", methods=["POST"])
-@login_required_page
-def open_daily_note():
-    user_id = session["user_id"]
-    today_title = f"Daily Note: {datetime.now().strftime('%Y-%m-%d')}"
-    note = Note.query.filter_by(user_id=user_id, title=today_title, is_trashed=False).first()
-    if note: return jsonify({"id": note.id, "workspace_id": note.workspace_id}), 200
-    ws = Workspace.query.filter_by(user_id=user_id).order_by(Workspace.created_at.desc()).first()
-    if not ws: return jsonify({"status": "error", "message": "Please create a workspace first."}), 400
-    new_note = Note(title=today_title, content='{"time":1700000000,"blocks":[{"id":"header","type":"header","data":{"text":"Today\'s Focus","level":2}}],"version":"2.28.0"}', user_id=user_id, workspace_id=ws.id)
-    db.session.add(new_note); db.session.commit()
-    return jsonify({"id": new_note.id, "workspace_id": ws.id}), 201
-
-# ----------------- NOTES TRASH API -----------------
-
-@app.route("/api/workspaces/<int:ws_id>/trash", methods=["GET"])
-@login_required_page
-def get_trash(ws_id):
-    notes = Note.query.filter_by(user_id=session["user_id"], workspace_id=ws_id, is_trashed=True)\
-                      .order_by(Note.updated_at.desc()).all()
-    return jsonify([n.to_dict() for n in notes]), 200
-
-@csrf.exempt
-@app.route("/api/notes/<int:note_id>/restore", methods=["POST"])
-@login_required_page
-def restore_note(note_id):
-    n = Note.query.get_or_404(note_id)
-    if n.user_id != session["user_id"]: return jsonify({"status": "error"}), 403
-    n.is_trashed = False
-    db.session.commit()
-    return jsonify({"status": "success"}), 200
-
-@csrf.exempt
-@app.route("/api/notes/<int:note_id>/permanent", methods=["DELETE"])
-@login_required_page
-def hard_delete_note(note_id):
-    n = Note.query.get_or_404(note_id)
-    if n.user_id != session["user_id"]: return jsonify({"status": "error"}), 403
-    db.session.delete(n)
-    db.session.commit()
-    return jsonify({"status": "success"}), 200
-
+# REMOVED: Workspaces API and Notes API (since notes depend on workspaces)
 
 # --- DB MIGRATION CHECK ---
 with app.app_context():
@@ -542,24 +347,19 @@ with app.app_context():
             result = conn.execute(text("PRAGMA table_info(note)"))
             cols_note = [row[1] for row in result.fetchall()]
             if "is_trashed" not in cols_note:
-                print("Migrating DB: Adding is_trashed column to Note table...")
                 conn.execute(text("ALTER TABLE note ADD COLUMN is_trashed BOOLEAN DEFAULT 0 NOT NULL"))
             
             result = conn.execute(text("PRAGMA table_info(task)"))
             cols_task = [row[1] for row in result.fetchall()]
             if "position" not in cols_task:
-                print("Migrating DB: Adding position column to Task table...")
                 conn.execute(text("ALTER TABLE task ADD COLUMN position INTEGER DEFAULT 0"))
 
             result = conn.execute(text("PRAGMA table_info(workspace)"))
             cols_ws = [row[1] for row in result.fetchall()]
             if "position" not in cols_ws:
-                print("Migrating DB: Adding position column to Workspace table...")
                 conn.execute(text("ALTER TABLE workspace ADD COLUMN position INTEGER DEFAULT 0"))
             
-            # NEW: Check for is_trashed in Workspace
             if "is_trashed" not in cols_ws:
-                print("Migrating DB: Adding is_trashed column to Workspace table...")
                 conn.execute(text("ALTER TABLE workspace ADD COLUMN is_trashed BOOLEAN DEFAULT 0 NOT NULL"))
             
             conn.commit()
