@@ -199,8 +199,6 @@
                         <h1 class="h4 mb-0 fw-bold text-dark">Tasks</h1>
 
                         <div class="d-flex align-items-center gap-2">
-                            <!-- UPDATED: Removed Sort Dropdown from Tasks -->
-
                             <!-- Filter Dropdown -->
                             <div class="dropdown">
                                 <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
@@ -251,7 +249,7 @@
                     <div class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom">
                         <h1 class="h4 mb-0 fw-bold text-dark">Notes</h1>
 
-                        <!-- UPDATED: Added Note Sort Dropdown here -->
+                        <!-- Note Sort Dropdown -->
                         <div class="d-flex align-items-center">
                             <div class="dropdown me-2">
                                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
@@ -485,11 +483,8 @@
             e.preventDefault();
             const sortType = e.target.getAttribute('data-note-sort');
             currentNoteSort = sortType;
-
-            // Update label text
             const labelText = e.target.textContent;
             document.getElementById('noteSortLabel').textContent = labelText.replace(/Date \(|\)/g, '').replace('Alphabetical (A-Z)', 'Alphabetical');
-
             loadNotes();
         });
     });
@@ -517,9 +512,7 @@
                     previewText = parsed.blocks.map(b => b.data.text).join(" ");
                 }
             } catch (e) { }
-
             if (!previewText) previewText = "<em>No additional text</em>";
-
             return `
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="note-card" onclick="openEditNoteModal(${note.id})">
@@ -554,7 +547,6 @@
 
             document.getElementById('currentNoteId').value = note.id;
             document.getElementById('noteTitleInput').value = note.title;
-
             let contentVal = note.content;
             try {
                 const parsed = JSON.parse(note.content);
@@ -562,9 +554,7 @@
                     contentVal = parsed.blocks.map(b => b.data.text).join("\n\n");
                 }
             } catch (e) { }
-
             document.getElementById('noteContentInput').value = contentVal;
-
             document.getElementById('deleteNoteBtn').classList.remove('d-none');
             noteModal.show();
         } catch (e) { console.error(e); }
@@ -574,17 +564,14 @@
         const id = document.getElementById('currentNoteId').value;
         const title = document.getElementById('noteTitleInput').value;
         const content = document.getElementById('noteContentInput').value;
-
         const url = id ? `/api/standalone_notes/${id}` : '/api/standalone_notes';
         const method = id ? 'PUT' : 'POST';
-
         try {
             const res = await fetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                 body: JSON.stringify({ title, content })
             });
-
             if (res.ok) {
                 noteModal.hide();
                 loadNotes();
@@ -596,7 +583,6 @@
         const id = document.getElementById('currentNoteId').value;
         if (!id) return;
         if (!confirm("Are you sure you want to delete this note?")) return;
-
         try {
             const res = await fetch(`/api/standalone_notes/${id}`, {
                 method: 'DELETE',
@@ -609,7 +595,57 @@
         } catch (e) { console.error(e); }
     });
 
-    // Initial Load
+    // --- 4. Overview Stats Logic ---
+    async function updateOverviewStats() {
+        try {
+            const res = await fetch('/api/tasks');
+            const tasks = await res.json();
+
+            let todayCount = 0;
+            let overdueCount = 0;
+            let completedCount = 0;
+            let pendingCount = 0;
+
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            tasks.forEach(t => {
+                if (t.completed) {
+                    completedCount++;
+                } else {
+                    pendingCount++;
+                    if (t.due_date) {
+                        const dueParts = t.due_date.split('-');
+                        const dueDay = new Date(dueParts[0], dueParts[1] - 1, dueParts[2]);
+
+                        if (dueDay.getTime() === today.getTime()) {
+                            todayCount++;
+                        } else if (dueDay < today) {
+                            overdueCount++;
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('stat-today').textContent = todayCount;
+            document.getElementById('stat-overdue').textContent = overdueCount;
+            document.getElementById('stat-completed').textContent = completedCount;
+            document.getElementById('stat-total').textContent = pendingCount;
+
+        } catch (e) { console.error("Stats error:", e); }
+    }
+
+    // --- 5. Init ---
     loadNotes();
+    updateOverviewStats();
+
+    // Observer to update stats when task list changes
+    const taskListObserver = new MutationObserver(() => {
+        updateOverviewStats();
+    });
+    const taskListEl = document.getElementById('taskList');
+    if (taskListEl) {
+        taskListObserver.observe(taskListEl, { childList: true, subtree: true });
+    }
 </script>
 {% endblock %}
