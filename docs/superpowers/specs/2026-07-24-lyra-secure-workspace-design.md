@@ -2,66 +2,62 @@
 
 **Date:** 24 July 2026  
 **Repository:** `JoelLovesKFC/PWA-AT1`  
-**Target branch:** `refactor/lyra-band6`  
-**Status:** Approved design for implementation planning
+**Branch:** `refactor/lyra-band6`  
+**Status:** Approved design, ready for implementation planning
 
 ## 1. Purpose
 
-The existing Nobu productivity PWA will be refurbished and rebranded as **LYRA**, a secure document, task and notes workspace designed to satisfy the highest performance band of the Year 12 Software Engineering Assessment Task 3.
+The existing Nobu productivity PWA will be refurbished and rebranded as **LYRA**, a secure document, task and notes workspace. The project will retain its working Flask, SQLite, Bootstrap and JavaScript foundation while adding secure document management, role-based approval, audit logging, automation, stronger validation, automated tests and complete assessment evidence.
 
-The refurbishment will retain the current working Flask, SQLite, Bootstrap and JavaScript functionality while adding secure document management, role-based approval workflows, audit logging, automated validation and cleanup, stronger security, automated tests and complete project evidence.
+The aim is to improve and extend the existing work rather than replace it. The final system must remain easy for the teacher to install and run locally.
 
-The goal is not to discard the current project. The goal is to preserve its working features, improve its engineering quality and align the final submission closely with the supplied secure document management project option and marking rubric.
+## 2. Confirmed decisions
 
-## 2. Confirmed Decisions
-
-- The product will be renamed from **Nobu** to **LYRA**.
-- The current clean productivity visual style will be retained.
-- Existing task, notes, profile and trash features will remain.
-- Secure document upload, review and approval features will be added.
-- The backend will be reorganised into modular Flask blueprints and services.
-- The system will support Standard User, Reviewer and Admin roles.
-- New registrations will default to Standard User.
-- Three demo roles will be available through a local seeding command for assessment marking.
-- Allowed uploads will be PDF, DOCX and TXT files up to 10 MB.
-- Files will be stored outside the public static directory.
-- The application will remain locally runnable on the teacher's laptop.
+- Rename the product from **Nobu** to **LYRA**.
+- Keep the existing clean productivity interface rather than rebuilding it in React.
+- Preserve tasks, notes, profile and trash features.
+- Add secure PDF, DOCX and TXT uploads up to 10 MB.
+- Add Standard User, Reviewer and Admin roles.
+- New registrations always receive the Standard User role.
+- Provide a local command that seeds one demonstration account for each role.
+- Store files outside the public static directory.
+- Refactor the backend into modular Flask blueprints and services.
+- Add unit tests, integration tests and GitHub Actions automation.
+- Add documentation matching every supplied folio and checklist section.
 
 ## 3. Scope
 
-### 3.1 In scope
+### Included
 
-- LYRA rebranding across templates, metadata, PWA files and documentation
-- modular Flask application factory and blueprints
-- secure login, registration and session handling
-- user role and account-status management
-- secure document upload and protected download
-- document submission, approval, rejection and resubmission
-- document metadata and review history
-- audit logging
-- simulated dashboard notifications
-- automated file validation
-- automated rejected-file cleanup command
-- preservation of task, note, profile and trash features
-- unit and integration tests
-- GitHub Actions test automation
-- complete README and local setup instructions
-- folio evidence and technical diagrams under `docs/`
+- LYRA branding across templates, PWA metadata, icons/text references and documentation
+- Flask application factory and modular blueprints
+- secure registration, login, logout and session handling
+- account roles and active/disabled status
+- protected document upload and download
+- document submission, review, rejection, revision and approval
+- review history, audit records and dashboard notifications
+- automatic file validation
+- scheduled cleanup of old rejected documents
+- Admin user management
+- preservation and regression testing of current productivity features
+- local setup instructions, `requirements.txt` and `.env.example`
+- GitHub Actions test workflow
+- folio planning, design, test and evaluation evidence
 
-### 3.2 Out of scope
+### Excluded
 
-- cloud deployment as a requirement for marking
+- cloud deployment as a marking requirement
 - real email delivery
-- external antivirus services
-- real-time multi-user collaboration
+- external antivirus subscriptions
+- real-time multi-user editing
 - native mobile applications
-- replacing SQLite with a hosted database
-- replacing Bootstrap with a full React rebuild
-- production-grade enterprise identity providers
+- hosted database infrastructure
+- enterprise single sign-on
+- complete frontend framework rewrite
 
-These exclusions keep the project achievable, testable and aligned with the assessment without adding unnecessary implementation risk.
+These exclusions keep the project achievable and reduce the risk of submitting unfinished features.
 
-## 4. Proposed Architecture
+## 4. Architecture
 
 ```text
 PWA-AT1/
@@ -70,32 +66,23 @@ PWA-AT1/
 │   ├── config.py
 │   ├── extensions.py
 │   ├── models/
-│   │   ├── __init__.py
 │   │   ├── user.py
 │   │   ├── document.py
+│   │   ├── review.py
 │   │   ├── audit_log.py
 │   │   ├── notification.py
 │   │   ├── task.py
 │   │   ├── note.py
 │   │   └── workspace.py
 │   ├── auth/
-│   │   ├── routes.py
-│   │   └── validators.py
 │   ├── documents/
-│   │   ├── routes.py
-│   │   ├── permissions.py
-│   │   └── transitions.py
 │   ├── admin/
-│   │   └── routes.py
 │   ├── tasks/
-│   │   └── routes.py
 │   ├── notes/
-│   │   └── routes.py
 │   ├── profile/
-│   │   └── routes.py
 │   ├── services/
-│   │   ├── file_storage.py
 │   │   ├── file_validation.py
+│   │   ├── file_storage.py
 │   │   ├── audit_service.py
 │   │   ├── notification_service.py
 │   │   └── cleanup_service.py
@@ -116,79 +103,101 @@ PWA-AT1/
 └── README.md
 ```
 
-### 4.1 Architectural principles
+### Architectural rules
 
-- **Separation of concerns:** page routes, APIs, models, validation and storage logic will not remain mixed in one large file.
-- **Application factory:** tests and local runtime can create the app with different configuration values.
-- **Blueprint isolation:** authentication, documents, administration, tasks, notes and profile functionality remain independently understandable.
-- **Service isolation:** file handling, auditing, notifications and cleanup are reusable services rather than route-specific code.
-- **Least privilege:** every protected operation checks the authenticated user's role and ownership.
-- **Backward preservation:** current task and notes behaviour is migrated rather than removed.
+- Routes, models, validation, permissions and storage must not remain mixed in one large file.
+- The application factory must support development and isolated testing configurations.
+- Blueprints isolate authentication, documents, administration, tasks, notes and profile functions.
+- Services isolate file handling, auditing, notifications and cleanup.
+- Every protected action checks authentication, role and ownership in the backend.
+- Existing database table names are retained where practical to preserve current data.
 
-## 5. User Roles
+## 5. Roles and permissions
 
-### 5.1 Standard User
+The database stores roles as `user`, `reviewer` and `admin`. The interface displays `user` as **Standard User**.
 
-A Standard User can:
+### Standard User
+
+Can:
 
 - register and log in
-- upload PDF, DOCX and TXT documents up to 10 MB
+- upload valid documents
 - view and download their own documents
-- edit document metadata while a document is in Draft or Rejected state
-- submit a document for review
-- view status, review feedback and notifications
-- revise and resubmit rejected documents
-- use tasks, notes, profile and trash features
+- edit metadata in Draft state
+- submit a Draft for review
+- view status, feedback and notifications
+- revise a Rejected document and resubmit it
+- use tasks, notes, profile and trash
 
-A Standard User cannot:
+Cannot:
 
-- view another user's private documents
-- review or approve documents
-- change account roles
-- access the complete audit log
-- edit a document while it is pending review
-
-### 5.2 Reviewer
-
-A Reviewer can:
-
-- access documents currently awaiting review
-- download submitted documents
-- approve a pending document
-- reject a pending document with required feedback
-- view their review history
-- use ordinary productivity features
-
-A Reviewer cannot:
-
-- approve their own document
-- change user roles
-- alter a completed review decision without an authorised administrative override
-- access unrelated private drafts
-
-### 5.3 Admin
-
-An Admin can:
-
-- view all users and documents
-- assign Standard User, Reviewer and Admin roles
-- disable and reactivate accounts
+- view another user's private files
+- review documents
+- change roles
 - view the complete audit log
-- review maintenance results
-- run cleanup and reporting commands
-- archive approved documents
-- override a document decision only when a reason is recorded
+- modify a Pending Review or Approved document
 
-### 5.4 Registration and demo accounts
+### Reviewer
 
-- Every public registration creates a Standard User account.
-- A Flask CLI command will create local demonstration users for the three roles.
-- Demo credentials will be generated or explicitly supplied when running the command rather than silently embedded in production code.
-- The README will explain the exact command needed for the teacher to create the accounts.
+Can:
 
-## 6. Document Workflow
+- access Pending Review documents they do not own
+- download submitted files
+- approve a Pending Review document
+- reject a Pending Review document with written feedback
+- view their previous review decisions
+- use normal productivity features
 
-### 6.1 State machine
+Cannot:
+
+- review or approve their own document
+- view unrelated private Draft documents
+- change user roles
+- rewrite completed review history
+
+### Admin
+
+Can:
+
+- view all users and document metadata
+- change roles
+- disable or reactivate accounts
+- view all audit records
+- view maintenance reports
+- trigger a non-destructive cleanup dry run from the Maintenance page
+- archive Approved documents
+- override an existing decision when a reason is recorded
+
+The destructive cleanup action remains a local CLI command to reduce accidental deletion. An Admin cannot approve their own document, including through override.
+
+### Demo accounts
+
+The command below creates or resets the three assessment accounts:
+
+```bash
+flask seed-demo --password "TeacherChosenPassword"
+```
+
+It creates:
+
+- `demo_user`
+- `demo_reviewer`
+- `demo_admin`
+
+The password is supplied by the person running the command and is not hardcoded in production code. The command is idempotent so it can be safely rerun for marking.
+
+## 6. Document workflow
+
+### States
+
+- `draft`
+- `pending_review`
+- `approved`
+- `rejected`
+- `archived`
+- `expired`
+
+### State machine
 
 ```text
 Draft
@@ -196,213 +205,204 @@ Draft
 Pending Review
   ├── approve ──> Approved ──> Archived
   └── reject ───> Rejected ──> Draft ──> Pending Review
+                         └──── cleanup after retention ──> Expired
 ```
 
-### 6.2 Permitted transitions
+### Permitted transitions
 
 | Current state | Actor | Action | New state | Conditions |
 |---|---|---|---|---|
-| Draft | Owner | Submit | Pending Review | File exists and metadata is valid |
-| Pending Review | Reviewer | Approve | Approved | Reviewer is not owner |
-| Pending Review | Reviewer | Reject | Rejected | Non-empty feedback required |
-| Rejected | Owner | Revise | Draft | Owner uploads a replacement or edits metadata |
-| Approved | Admin | Archive | Archived | Administrative action is audited |
-| Any applicable state | Admin | Override | Approved or Rejected | Reason is mandatory and logged |
+| Draft | Owner | Submit | Pending Review | Stored file exists and metadata is valid |
+| Pending Review | Reviewer/Admin | Approve | Approved | Actor is not the owner |
+| Pending Review | Reviewer/Admin | Reject | Rejected | Actor is not owner; feedback is required |
+| Rejected | Owner | Revise | Draft | Replacement file or metadata revision is saved |
+| Approved | Admin | Archive | Archived | Reason is recorded in audit details |
+| Rejected | Cleanup service | Expire | Expired | Rejected for at least the configured retention period |
+| Pending Review, Approved or Rejected | Admin | Override decision | Approved or Rejected | Actor is not owner; reason is required |
 
-The backend will reject every invalid transition even if a request is manually constructed outside the interface.
+All invalid transitions return a safe 400 or 403 response. Interface controls do not replace backend enforcement.
 
-### 6.3 Document list metadata
+### Review history
 
-Each document record shown in the interface will include:
+Each decision creates a new `DocumentReview` record. Earlier approvals, rejections and feedback are never overwritten. This lets the folio demonstrate a clear approval state machine and complete decision history.
+
+### Document list
+
+Each row displays:
 
 - original filename
-- type and file size
+- file type and size
 - owner
-- status
-- upload date
-- submission date
-- reviewer
-- decision date
+- current status
+- version
+- upload and submission dates
+- latest reviewer and decision date
 - latest feedback
-- current version
-- available actions based on the active user's permissions
+- role-appropriate actions
 
-### 6.4 Review history
+## 7. Data model
 
-Review decisions will be stored in a separate `DocumentReview` table. A new decision will not overwrite the previous decision history. This provides stronger auditability and allows rejected documents to be revised and resubmitted while preserving earlier feedback.
-
-## 7. Data Model
-
-### 7.1 User
+### User
 
 ```text
-User
-- id: Integer, primary key
-- name: String(100), required
-- username: String(80), unique, required
-- email: String(120), unique, required
-- password_hash: String, required
-- role: Enum-like string [user, reviewer, admin]
-- is_active: Boolean, default true
-- created_at: DateTime
+id                 Integer, primary key
+name               String(100), required
+username           String(80), unique, required
+email              String(120), unique, required
+password_hash      String, required
+role               String [user, reviewer, admin], required
+is_active          Boolean, default true
+created_at         DateTime, required
 ```
 
-### 7.2 Document
+### Document
 
 ```text
-Document
-- id: Integer, primary key
-- original_filename: String, required
-- storage_filename: String, unique, required
-- mime_type: String, required
-- file_size: Integer, required
-- status: Enum-like string [draft, pending_review, approved, rejected, archived]
-- owner_id: Foreign key -> User.id
-- current_version: Integer, default 1
-- created_at: DateTime
-- updated_at: DateTime
-- submitted_at: DateTime, nullable
-- archived_at: DateTime, nullable
+id                 Integer, primary key
+original_filename  String, required
+storage_filename   String, unique, nullable after expiry
+mime_type          String, required
+file_size          Integer, required
+status             String [draft, pending_review, approved, rejected, archived, expired]
+owner_id           Foreign key -> User.id, required
+current_version    Integer, default 1
+created_at         DateTime, required
+updated_at         DateTime, required
+submitted_at       DateTime, nullable
+archived_at        DateTime, nullable
+file_removed_at    DateTime, nullable
 ```
 
-### 7.3 DocumentReview
+### DocumentReview
 
 ```text
-DocumentReview
-- id: Integer, primary key
-- document_id: Foreign key -> Document.id
-- reviewer_id: Foreign key -> User.id
-- decision: Enum-like string [approved, rejected, override_approved, override_rejected]
-- feedback: Text
-- decided_at: DateTime
+id                 Integer, primary key
+document_id        Foreign key -> Document.id, required
+reviewer_id        Foreign key -> User.id, required
+decision           String [approved, rejected, override_approved, override_rejected]
+feedback           Text
+decided_at         DateTime, required
 ```
 
-### 7.4 AuditLog
+### AuditLog
 
 ```text
-AuditLog
-- id: Integer, primary key
-- actor_id: Foreign key -> User.id, nullable for anonymous login failures
-- action: String, required
-- target_type: String
-- target_id: Integer, nullable
-- result: String [success, failure]
-- details: JSON/Text
-- ip_address: String
-- created_at: DateTime
+id                 Integer, primary key
+actor_id           Foreign key -> User.id, nullable for anonymous failures
+action             String, required
+target_type        String
+target_id          Integer, nullable
+result             String [success, failure]
+details            JSON/Text
+ip_address         String
+created_at         DateTime, required
 ```
 
-### 7.5 Notification
+### Notification
 
 ```text
-Notification
-- id: Integer, primary key
-- user_id: Foreign key -> User.id
-- message: String, required
-- is_read: Boolean, default false
-- related_document_id: Foreign key -> Document.id, nullable
-- created_at: DateTime
+id                   Integer, primary key
+user_id              Foreign key -> User.id, required
+message              String, required
+is_read              Boolean, default false
+related_document_id  Foreign key -> Document.id, nullable
+created_at           DateTime, required
 ```
 
-### 7.6 Existing models
+Existing Task, Note and Workspace entities remain linked to their owner. Their current records must survive the migration.
 
-Existing `Task`, `Note` and `Workspace` records remain associated with their owning user. Their routes and models will be migrated into modular files while preserving their existing data and public behaviour.
+## 8. Secure file handling
 
-## 8. Secure File Handling
+### File rules
 
-### 8.1 Accepted files
+- accepted extensions: `.pdf`, `.docx`, `.txt`
+- maximum request size: 10 MB
+- original filename retained only as metadata
+- physical storage filename generated with a random UUID
+- files stored under the configured protected upload directory, never `/static`
+- downloads served only by a permission-checked Flask route
 
-- `.pdf`
-- `.docx`
-- `.txt`
-- maximum size: 10 MB
+### Content validation
 
-### 8.2 Upload process
+LYRA does not trust the browser-provided MIME value alone.
 
-```text
-Authenticated request
-  ↓
-Role and CSRF checks
-  ↓
-Presence and size validation
-  ↓
-Extension and MIME validation
-  ↓
-Original filename sanitisation
-  ↓
-Random server-side storage name
-  ↓
-Write to protected uploads directory
-  ↓
-Create database record
-  ↓
-Create audit record
-  ↓
-Return safe response
-```
+- PDF files must begin with a valid PDF signature.
+- DOCX files must be valid ZIP containers containing the expected Office document entries.
+- TXT files must decode as text and must not contain binary null bytes.
+- The extension, detected content type and submitted MIME type must be compatible.
 
-### 8.3 Storage rules
+This pure-Python validation avoids platform-specific native dependencies that could prevent the teacher running the project on Windows.
 
-- Uploaded files are never stored under `/static`.
-- The original filename is metadata only.
-- The physical filename is a random identifier with a validated extension.
-- Files are accessed only through an authenticated Flask download route.
-- The download route rechecks ownership or role permission.
-- Paths are built from server-controlled values, not raw user input.
-- Missing or altered storage files produce a safe error and audit event.
-- Uploaded content is never executed by the server.
+### Transaction behaviour
 
-### 8.4 Failure handling
+1. Validate request and permission.
+2. Validate file size, extension and content signature.
+3. Generate the server-controlled storage name.
+4. Write the file to protected storage.
+5. Create the database record and audit event in one database transaction.
+6. If the database transaction fails, remove the newly written file.
+7. If file writing fails, do not create the database record.
 
-When database creation fails after a file has been written, the file will be removed to avoid orphaned data. When file writing fails, no database record will be committed.
+### Downloads
 
-## 9. Security Design
+The route verifies:
 
-### 9.1 Authentication
+- an authenticated session
+- document existence
+- file availability
+- owner, assigned reviewer or Admin permission
+- a safe server-controlled path
 
-- Bcrypt password hashing remains in use.
-- Password rules will be strengthened and centralised.
-- Login remains rate-limited.
-- Disabled accounts cannot authenticate.
-- Successful and failed login attempts are audited.
-- Session data is cleared during logout.
+Every successful and denied download attempt creates an audit record.
 
-### 9.2 Configuration
+## 9. Authentication and security
 
-- The fallback secret key is removed from runtime code.
-- `SECRET_KEY` is loaded from environment configuration.
-- `.env.example` documents required values without containing real secrets.
-- Development, testing and production-like settings are separated.
-- Debug mode is not forced on in `run.py`.
-- Secure cookie flags are configurable and enabled where appropriate.
+### Passwords
 
-### 9.3 Authorisation
+- Bcrypt hashing remains in use.
+- Passwords must be 10 to 128 characters.
+- Passwords must contain at least one uppercase letter, lowercase letter and number.
+- Validation is centralised and covered by boundary tests.
 
-- Page visibility and backend permission checks are separate controls.
-- Decorators or permission helpers enforce authentication and roles.
-- Ownership is checked for every user-specific document, task and note action.
-- Reviewers cannot approve their own documents.
-- Admin actions require explicit role checks and generate audit records.
+### Sessions
 
-### 9.4 CSRF and validation
+- login remains rate-limited
+- disabled users cannot authenticate
+- successful login makes the session permanent for a configurable two-hour lifetime
+- cookies use `HttpOnly` and `SameSite=Lax`
+- `Secure` is enabled when HTTPS is used
+- logout clears the session
+- login success and failure are audited
 
-- Broad `@csrf.exempt` usage will be removed from state-changing browser APIs.
-- JavaScript requests will submit the CSRF token in a consistent header.
-- Required fields, lengths, identifiers, role values, statuses and dates are validated centrally.
-- Invalid JSON and malformed requests return consistent 400 responses.
-- Database exceptions are logged without exposing stack traces to users.
+### Configuration
 
-### 9.5 Output safety
+- no fallback production secret key
+- `SECRET_KEY` loaded from environment variables
+- `.env.example` documents required local values
+- separate development and testing configuration classes
+- debug mode is not forced on by `run.py`
+- upload directory, database URI, retention period and maximum file size are configurable
 
-- Dynamic user text is escaped before insertion into HTML.
-- Document feedback and names are displayed through safe templates or text-node operations.
-- Error responses do not reveal local paths, SQL statements or internal exceptions.
+### CSRF and validation
 
-## 10. Interface Design
+- state-changing browser requests require Flask-WTF CSRF protection
+- JavaScript sends the token in `X-CSRFToken`
+- broad `@csrf.exempt` use is removed
+- JSON CSRF failures return a consistent safe error
+- identifiers, roles, statuses, lengths, dates and ownership are validated server-side
 
-The existing clean Bootstrap-based design will be preserved and rebranded as LYRA. This reduces implementation risk and keeps evidence of the original development work.
+### Output safety
 
-### 10.1 Standard User navigation
+- user-controlled text is escaped before insertion into HTML
+- JavaScript uses text nodes or explicit escaping for dynamic content
+- errors never reveal SQL, local paths, secret values or stack traces
+- full diagnostic details go only to application logs
+
+## 10. Interface
+
+The existing responsive Bootstrap layout remains the visual foundation.
+
+### Standard User navigation
 
 ```text
 Dashboard
@@ -413,14 +413,14 @@ Profile
 Trash
 ```
 
-### 10.2 Reviewer additions
+### Reviewer additions
 
 ```text
 Review Queue
 Review History
 ```
 
-### 10.3 Admin additions
+### Admin additions
 
 ```text
 User Management
@@ -429,22 +429,19 @@ Audit Log
 Maintenance
 ```
 
-### 10.4 Interface rules
+### Interface rules
 
-- Navigation items appear according to role.
-- Backend authorisation remains mandatory even when an action is hidden.
-- Validation failures appear beside the related field or in an accessible alert.
-- Approval, rejection, permanent deletion and administrative override require confirmation.
-- Rejection requires written feedback.
-- Status is communicated through text and badges, not colour alone.
-- Tables remain usable on smaller screens through responsive layouts.
-- Forms have visible labels and keyboard-accessible controls.
+- actions are hidden when irrelevant but still protected in the backend
+- forms use visible labels and keyboard-accessible controls
+- errors appear beside the related field or in an accessible alert
+- status uses text and icons as well as colour
+- document tables remain usable on smaller screens
+- rejection requires feedback before submission
+- approval, rejection, permanent deletion and override use confirmation dialogs
 
-## 11. API and Error Response Conventions
+## 11. API response convention
 
-State-changing endpoints will return a consistent JSON format.
-
-### 11.1 Success
+### Success
 
 ```json
 {
@@ -454,7 +451,7 @@ State-changing endpoints will return a consistent JSON format.
 }
 ```
 
-### 11.2 Validation failure
+### Validation failure
 
 ```json
 {
@@ -465,124 +462,119 @@ State-changing endpoints will return a consistent JSON format.
 }
 ```
 
-### 11.3 Error handlers
-
-Custom handlers will cover:
-
-- 400 invalid request
-- 401 unauthenticated
-- 403 forbidden
-- 404 missing record
-- 413 oversized upload
-- database failures
-- unexpected 500 errors
-
-Application logs retain diagnostic detail. Browser responses remain safe and understandable.
+Custom handlers cover invalid requests, unauthenticated access, forbidden actions, missing records, oversized requests, database errors and unexpected server errors.
 
 ## 12. Automation
 
-### 12.1 Upload validation automation
+### Upload validation
 
-Every uploaded document is automatically checked for:
+Every upload automatically checks presence, size, extension, content signature, filename safety and collision avoidance.
 
-- presence
-- size
-- approved extension
-- expected MIME type
-- filename safety
-- storage collision avoidance
+### Rejected-document cleanup
 
-### 12.2 Cleanup automation
-
-A Flask CLI command will inspect rejected documents older than a configured retention period.
+The default retention period is 30 days and can be changed through configuration.
 
 ```bash
 flask cleanup-documents --dry-run
 flask cleanup-documents
 ```
 
-The dry-run mode lists planned actions without deleting files. The real mode removes eligible files or archives records according to the final implementation rule, records the result and produces a summary.
+Dry run:
 
-### 12.3 Notifications
+- lists eligible rejected documents
+- reports files that would be removed
+- changes no files or database records
 
-LYRA creates dashboard notifications when:
+Execution:
+
+- selects documents that have remained Rejected for at least the retention period
+- deletes the protected binary file
+- changes the document state to Expired
+- clears `storage_filename`
+- records `file_removed_at`
+- preserves metadata, review history and audit history
+- creates a user notification and cleanup audit record
+- prints a summary of processed, skipped and failed records
+
+### Notifications
+
+Notifications are created when:
 
 - a document is submitted
-- a document is approved
-- a document is rejected
-- an Admin changes a user's role
-- a maintenance process affects one of the user's documents
+- a document is approved or rejected
+- a rejected document is revised
+- a role or account status changes
+- cleanup expires a document
 
-Email delivery is intentionally simulated because real external email infrastructure is outside the assessment scope.
+Real email delivery is simulated through the dashboard because external email infrastructure is outside scope.
 
-## 13. Testing Strategy
+## 13. Testing
 
-### 13.1 Test environment
+### Test environment
 
-- Pytest will be used.
-- Tests will create the Flask application through the application factory.
-- Each test run uses an isolated temporary SQLite database.
-- File tests use a temporary upload directory.
-- Test data will never modify the submitted local database.
-- CSRF behaviour will be deliberately tested rather than globally disabled without evidence.
+- Pytest and pytest-cov
+- application factory with test configuration
+- temporary SQLite database for every test session
+- temporary protected upload directory
+- no changes to the submitted database or real upload folder
+- CSRF behaviour tested explicitly
 
-### 13.2 Unit tests
+### Unit coverage
 
-- password validation
-- role validation
-- canonical status handling
-- allowed document transitions
-- prevention of invalid transitions
-- extension validation
-- MIME validation
-- 10 MB size boundary
-- secure random storage naming
-- retention-date calculation
-- notification creation
-- audit-event creation
+- password boundaries and complexity
+- role and account-status validation
+- document transition matrix
+- self-review prevention
+- extension and content-signature validation
+- exact 10 MB size boundary
+- random storage naming and safe path building
+- retention-date calculations
+- audit and notification creation
+- cleanup selection and state changes
 
-### 13.3 Integration tests
+### Integration coverage
 
-- registration creates a Standard User
-- valid login succeeds
-- invalid login is rejected
-- disabled account login is rejected
-- Standard User uploads a valid document
-- invalid extension is rejected
-- oversized file is rejected
-- unauthenticated upload is rejected
-- user cannot access another user's private document
-- owner submits a Draft document
-- Reviewer approves a pending document
-- Reviewer rejects with feedback
-- rejection without feedback fails
-- Reviewer cannot approve their own document
-- owner revises and resubmits a rejected document
-- Admin changes a role
-- non-Admin role change fails
-- every important action creates an audit record
-- cleanup dry-run does not delete data
-- cleanup removes or archives eligible test records
-- task CRUD regression tests
-- note CRUD regression tests
-- protected download tests
+- registration defaults to Standard User
+- login success, failure and rate-limit behaviour
+- disabled-account rejection
+- valid PDF, DOCX and TXT uploads
+- invalid, disguised and oversized upload rejection
+- unauthenticated and cross-user access rejection
+- protected downloads
+- Draft submission
+- Reviewer approval
+- rejection with required feedback
+- rejection without feedback failure
+- self-approval failure for Reviewer and Admin
+- rejected-document revision and resubmission
+- Admin role and account-status changes
+- non-Admin management failure
+- audit records for critical actions
+- notification lifecycle
+- cleanup dry run and execution
+- existing task CRUD regression
+- existing note CRUD regression
+- trash restore and permanent-delete regression
 
-### 13.4 Automated commands
+### Coverage targets
+
+- every route must have at least one success and one relevant failure test
+- all document transition, permission and file-validation branches must be covered
+- target at least 85% total line coverage
+- target 100% line coverage for transition and permission modules
+
+Commands:
 
 ```bash
 pytest
 pytest --cov=app --cov-report=term-missing
-flask seed-demo
+flask seed-demo --password "TeacherChosenPassword"
 flask cleanup-documents --dry-run
 ```
 
-### 13.5 Continuous integration
+GitHub Actions runs tests on pushes and pull requests. Test outputs are documented only after they have actually run.
 
-`.github/workflows/tests.yml` will install dependencies and run the automated test suite on pushes and pull requests. This provides repeatable evidence of automated testing.
-
-## 14. Documentation and Folio Evidence
-
-The `docs/` folder will contain evidence aligned with the supplied folio template and checklist.
+## 14. Documentation package
 
 ```text
 docs/
@@ -606,84 +598,71 @@ docs/
 └── 18-final-evaluation.md
 ```
 
-The documentation will distinguish between:
+Documentation clearly separates planned behaviour, implemented behaviour, automated evidence, manual evidence, measured optimisation and remaining limitations. No screenshots, performance results, test results or user feedback are claimed before evidence exists.
 
-- planned behaviour
-- implemented behaviour
-- automated test evidence
-- manual testing evidence
-- optimisation changes
-- remaining limitations
-
-No test result, performance result, screenshot or user feedback will be claimed until it has actually been produced.
-
-## 15. Migration Strategy
-
-The refurbishment must preserve the current application while allowing the architecture to improve safely.
-
-### 15.1 Sequence
+## 15. Migration sequence
 
 1. Add configuration, extensions and application factory.
-2. Move existing database models without changing their table names.
-3. Register existing routes through blueprints.
-4. Run regression tests for current task and note behaviour.
-5. Add role and account fields using an idempotent local migration strategy.
-6. Add document, review, audit and notification tables.
-7. Add secure document services and routes.
-8. Add Reviewer and Admin pages.
-9. Rebrand user-visible Nobu references to LYRA.
-10. Complete automated tests and documentation evidence.
+2. Move current models without changing existing table names.
+3. Move existing routes into blueprints.
+4. Add regression tests for tasks, notes, profile and trash.
+5. Add `role`, `is_active` and `created_at` fields with safe defaults.
+6. Add Document, DocumentReview, AuditLog and Notification tables.
+7. Add secure validation and storage services.
+8. Add document workflow routes and pages.
+9. Add Reviewer and Admin functions.
+10. Rebrand all user-visible Nobu references to LYRA.
+11. Add CLI automation, CI and complete documentation.
+12. Run full tests and record only verified results.
 
-### 15.2 Data preservation
+Before schema changes, the README and folio will instruct the user to copy `instance/site.db` as a backup. Existing users default to Standard User and active. Existing tasks, notes and workspaces remain intact.
 
-- Existing table names and key fields will remain compatible where practical.
-- Existing users default to Standard User unless assigned another role.
-- Existing users default to active.
-- Existing tasks, notes and workspaces remain intact.
-- Database backups will be documented before schema changes.
+## 16. Acceptance criteria
 
-## 16. Acceptance Criteria
+The refurbishment is ready for submission only when:
 
-The refurbishment is ready for submission only when all of the following are true:
-
-1. The application starts locally from documented instructions.
-2. `requirements.txt` installs all required Python dependencies.
-3. LYRA branding replaces user-visible Nobu branding.
-4. New users register as Standard Users.
-5. Demo accounts can be created through a documented command.
-6. PDF, DOCX and TXT uploads up to 10 MB work.
-7. Disallowed and oversized files are rejected safely.
-8. Uploaded files are stored outside the static directory.
-9. Users cannot access another user's private files.
-10. Users can submit documents for review.
-11. Reviewers can approve or reject pending documents.
+1. The teacher can install and start LYRA from the README.
+2. `requirements.txt` contains every Python dependency.
+3. LYRA branding replaces all user-visible Nobu branding.
+4. New registrations receive the Standard User role.
+5. The demo seed command creates all three roles.
+6. Valid PDF, DOCX and TXT files up to 10 MB upload successfully.
+7. Disguised, invalid and oversized files are rejected safely.
+8. Uploaded files remain outside `/static`.
+9. Cross-user private-file access is prevented.
+10. Owners can submit Draft documents.
+11. Reviewers can approve or reject eligible Pending Review documents.
 12. Rejection requires feedback.
-13. Reviewers cannot review their own documents.
-14. Admins can manage roles and account status.
-15. Important actions create audit-log records.
-16. Notifications appear for workflow changes.
-17. Cleanup dry-run and execution commands work.
-18. Existing task and note functionality still works.
-19. Unit and integration tests pass locally.
-20. GitHub Actions runs the tests automatically.
-21. README setup and demonstration instructions are complete.
-22. Folio documentation covers every required checklist area.
-23. No default production secret or forced debug mode remains.
-24. Error messages do not expose sensitive internal details.
+13. No role can approve its own document.
+14. Rejected documents can be revised and resubmitted.
+15. Admins can manage roles and account status.
+16. Critical actions create audit records.
+17. Workflow changes create dashboard notifications.
+18. Cleanup dry run makes no changes.
+19. Cleanup execution expires eligible rejected documents while preserving metadata and history.
+20. Existing task, note, profile and trash behaviour still works.
+21. Unit and integration tests pass locally.
+22. GitHub Actions runs the same test suite automatically.
+23. Coverage targets are measured and documented.
+24. The README contains setup, demo and troubleshooting instructions.
+25. Every supplied folio/checklist area has corresponding evidence.
+26. No fallback secret or forced debug mode remains.
+27. Error messages do not expose sensitive internal details.
 
-## 17. Main Risks and Controls
+## 17. Risks and controls
 
 | Risk | Control |
 |---|---|
-| Refactor breaks current functionality | Migrate incrementally and add regression tests before feature expansion |
-| Scope becomes too large | Preserve existing Bootstrap UI and avoid React rebuild |
-| Existing database becomes incompatible | Preserve table names, use additive migrations and document backups |
-| File upload introduces security issues | Protected storage, allow-list validation, random names and permission-checked downloads |
-| Role checks exist only in interface | Enforce every permission in backend helpers and integration tests |
-| Testing is left until the end | Implement tests alongside each module and require CI execution |
-| Documentation makes unsupported claims | Record only verified test outputs, screenshots and measured results |
-| Teacher cannot run the application | Provide exact setup commands, `.env.example`, requirements and seed command |
+| Refactor breaks current features | Move incrementally and establish regression tests first |
+| Scope becomes too large | Preserve Bootstrap UI and exclude React/cloud/email rebuilds |
+| Existing database becomes incompatible | Additive schema changes, safe defaults and documented backup |
+| File upload creates vulnerabilities | Protected storage, content validation, random names and permission-checked download |
+| Role security exists only in the UI | Backend permission helpers and negative integration tests |
+| Destructive cleanup is triggered accidentally | UI provides dry run only; destructive action requires CLI command |
+| Testing is delayed | Write tests beside each module and require CI |
+| Documentation exaggerates results | Record only reproduced evidence and state remaining limits |
+| Teacher cannot run the project | Pure-Python dependencies, exact commands, `.env.example` and seed command |
 
-## 18. Implementation Principle
+## 18. Completion principle
 
-The implementation should favour a smaller, fully working and thoroughly tested solution over unfinished extra features. A feature is not complete until its permissions, validation, error handling, tests and documentation are also complete.
+Prefer a smaller fully working and thoroughly tested solution over unfinished extra features. A feature is complete only when its permissions, validation, error handling, tests and documentation are also complete.
